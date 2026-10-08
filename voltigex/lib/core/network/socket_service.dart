@@ -59,6 +59,11 @@ class SocketService {
   }
 
   bool _isMessageReadEvent(String? name) {
+    if (name == null || name.isEmpty) return false;
+    final raw = name.trim().toLowerCase();
+    if (raw == 'conversation.read' || raw.endsWith('.conversation.read')) {
+      return true;
+    }
     final normalized = _normalizeEventName(name);
     return normalized == 'messageread' || normalized == 'conversationread';
   }
@@ -395,12 +400,13 @@ class SocketService {
         if (_userInboxChannelName != null && event.channelName == _userInboxChannelName) {
           final cid = _conversationIdFromMessagePayload(event.data);
 
+          // Chat ouvert sur cette conversation : injecter dans le fil (sans rafraîchir l’inbox).
           if (cid != null &&
-              cid == _userInboxSuppressFetchConversationId &&
+              cid.isNotEmpty &&
               cid == _activeConversationId &&
-              isSent &&
-              _conversationHandler != null) {
-            _conversationHandler!.call(
+              cid == _userInboxSuppressFetchConversationId &&
+              isSent) {
+            _conversationHandler?.call(
               _conversationEnvelope(event.eventName, event.data),
             );
             return;

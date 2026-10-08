@@ -5,6 +5,8 @@
   "buttonOk": "OK",
   "buttonCancel": "Cancel",
   "buttonRetry": "Retry",
+  "adminWebOnlyTitle": "Admin portal on the web",
+  "adminWebOnlyBody": "Client support chat is only available on the web admin portal. Use a browser on your computer to reply to messages.",
   "languageUpdatedSuccess": "Language updated successfully",
   "languageSelectionTitle": "Language",
   "languageNameFr": "French",

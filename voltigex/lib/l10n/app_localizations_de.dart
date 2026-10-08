@@ -24,6 +24,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get buttonRetry => 'Erneut versuchen';
 
   @override
+  String get adminWebOnlyTitle => 'Admin-Bereich im Web';
+
+  @override
+  String get adminWebOnlyBody =>
+      'Der Kunden-Support-Chat ist nur im Web-Admin-Portal verfügbar. Bitte antworte über einen Browser am Computer.';
+
+  @override
   String get languageUpdatedSuccess => 'Sprache erfolgreich aktualisiert';
 
   @override

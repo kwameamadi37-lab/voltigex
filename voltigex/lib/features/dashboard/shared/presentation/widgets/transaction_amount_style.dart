@@ -7,14 +7,22 @@ class TransactionAmountStyle {
 
   static bool isDeposit(TransactionEntity t) => t.isIncoming;
 
+  static const Color depositGreen = Color(0xFF16A34A);
+  static const Color outgoingRed = Color(0xFFDC2626);
+
   static Color amountColor(TransactionEntity t) {
-    if (isDeposit(t)) return const Color(0xFF16A34A);
-    return const Color(0xFF111827);
+    if (isDeposit(t)) return depositGreen;
+    return outgoingRed;
   }
 
   static Color iconColor(TransactionEntity t) {
-    if (isDeposit(t)) return const Color(0xFF16A34A);
-    return const Color(0xFF1E3A8A);
+    if (isDeposit(t)) return depositGreen;
+    return outgoingRed;
+  }
+
+  static Color subtitleColor(TransactionEntity t) {
+    if (isDeposit(t)) return depositGreen;
+    return outgoingRed;
   }
 
   static IconData listIcon(TransactionEntity t) {

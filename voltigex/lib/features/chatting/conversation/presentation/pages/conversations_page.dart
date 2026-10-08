@@ -20,6 +20,7 @@ import 'package:voltigex/features/chatting/chat/presentation/pages/chat_page.dar
 import 'package:voltigex/features/chatting/conversation/domain/entities/conversation_entity.dart';
 import 'package:voltigex/features/chatting/conversation/domain/entities/user_search_result_item.dart';
 import 'package:voltigex/features/chatting/conversation/domain/usecases/check_or_create_conversation_use_case.dart';
+import 'package:voltigex/features/chatting/conversation/presentation/conversations_inbox_coordinator.dart';
 import 'package:voltigex/features/chatting/conversation/presentation/bloc/conversations_bloc.dart';
 import 'package:voltigex/features/chatting/conversation/presentation/bloc/conversations_event.dart';
 import 'package:voltigex/features/chatting/conversation/presentation/bloc/conversations_state.dart';
@@ -73,12 +74,10 @@ class _ConversationsPageState extends State<ConversationsPage> with WidgetsBindi
       // 2. Re-souscrire au canal inbox de l'utilisateur courant
       final userId = SessionController.instance.userId;
       if (userId != null) {
-        SocketService.instance.subscribeUserInbox(userId, (data) {
-          // Logique de rafraîchissement de l'inbox
-          context.read<ConversationsBloc>().add(
-            FetchConversationsEvent(forceFullSync: true),
-          );
-        });
+        SocketService.instance.subscribeUserInbox(
+          userId,
+          ConversationsInboxCoordinator.onInboxPusherData,
+        );
       }
       
       // Forcer la synchronisation et recharger les conversations

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:voltigex/core/di/injection_container.dart';
+import 'package:voltigex/core/network/notification_service.dart';
 import 'package:voltigex/core/session_controller.dart';
 import 'package:voltigex/core/theme.dart';
 import 'package:voltigex/features/dashboard/cards/presentation/bloc/cards_bloc.dart';
@@ -55,7 +56,12 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrapDefaultSupportChat());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _bootstrapDefaultSupportChat();
+      if (!SessionController.instance.isAdminSupport) {
+        NotificationService.registerTokenAfterAuth();
+      }
+    });
   }
 
   @override

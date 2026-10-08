@@ -8,6 +8,8 @@ class TransactionModel {
     required this.montant,
     required this.type,
     required this.dateTransaction,
+    this.progressPercent,
+    this.virementStatut,
   });
 
   final String id;
@@ -15,14 +17,26 @@ class TransactionModel {
   final String montant;
   final String type;
   final String dateTransaction;
+  final double? progressPercent;
+  final String? virementStatut;
 
   factory TransactionModel.fromHistoriqueJson(Map<String, dynamic> json) {
+    final pctRaw = json['pourcentage'];
+    double? pct;
+    if (pctRaw is num) {
+      pct = pctRaw.toDouble();
+    } else if (pctRaw != null) {
+      pct = double.tryParse(pctRaw.toString());
+    }
+
     return TransactionModel(
       id: (json['id'] ?? '').toString(),
       titre: (json['titre'] ?? '').toString(),
       montant: (json['montant'] ?? '0').toString(),
       type: (json['type'] ?? '').toString(),
       dateTransaction: (json['date_transaction'] ?? '').toString(),
+      progressPercent: pct,
+      virementStatut: json['virement_statut']?.toString(),
     );
   }
 
@@ -83,7 +97,8 @@ class TransactionModel {
       amount: amt.abs(),
       date: dateTransaction,
       status: 'REUSSI',
-      apiStatut: type,
+      progressPercent: progressPercent,
+      apiStatut: virementStatut ?? type,
       supportSlug: null,
     );
   }

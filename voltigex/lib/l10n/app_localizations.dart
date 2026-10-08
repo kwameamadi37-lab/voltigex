@@ -134,6 +134,18 @@ abstract class AppLocalizations {
   /// **'Riprova'**
   String get buttonRetry;
 
+  /// No description provided for @adminWebOnlyTitle.
+  ///
+  /// In it, this message translates to:
+  /// **'Area admin sul web'**
+  String get adminWebOnlyTitle;
+
+  /// No description provided for @adminWebOnlyBody.
+  ///
+  /// In it, this message translates to:
+  /// **'La chat di supporto clienti è disponibile solo sul portale admin web. Usa un browser sul computer per rispondere ai messaggi.'**
+  String get adminWebOnlyBody;
+
   /// No description provided for @languageUpdatedSuccess.
   ///
   /// In it, this message translates to:

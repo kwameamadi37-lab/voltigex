@@ -47,6 +47,8 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   static const int _olderMessagesPageLimit = 50;
   /// Dernier id message « moi » lu par le partenaire (API + recoupement local).
   String? _partnerLastSeenMessageId;
+  /// Évite des PATCH `/read` identiques en rafale (listener + scroll).
+  String? _lastReadPatchKey;
   static const String _kMetaLocalFilePath = 'localFilePath';
   /// Conservé sur les messages pending si la conversation n’existe pas encore (retry sans [_pendingRecipientUserId] perdu).
   static const String _kMetaPendingRecipientUserId = 'pendingRecipientUserId';
@@ -114,7 +116,34 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     emit(_emitLoaded());
   }
 
+  List<MessageEntity> _copyOutstandingLocalMessages() {
+    return _messages
+        .where(
+          (m) =>
+              m.isSaved == null ||
+              (m.id.isEmpty && m.clientId.trim().isNotEmpty),
+        )
+        .map((m) => m)
+        .toList();
+  }
+
+  void _reappendOutstandingLocals(List<MessageEntity> outstanding) {
+    if (outstanding.isEmpty) return;
+    for (final p in outstanding) {
+      final exists = _messages.any(
+        (m) =>
+            (p.clientId.isNotEmpty && m.clientId == p.clientId) ||
+            (p.id.isNotEmpty && m.id == p.id),
+      );
+      if (!exists) {
+        _messages.add(p);
+      }
+    }
+    _messages.sort(compareChatMessagesChronological);
+  }
+
   ChatLoadedState _emitLoaded() {
+    _messages.sort(compareChatMessagesChronological);
     final current = state;
     if (current is ChatLoadedState) {
       return current.copyWith(
@@ -296,6 +325,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       ConversationsInboxCoordinator.notifyChatClosed(cid, List<MessageEntity>.from(_messages));
     }
     _socketService.setUserInboxSuppressFetchForConversation(null);
+    ConversationsInboxCoordinator.deliverInboxPayloadToOpenChat = null;
   }
 
   List<MessageEntity> _sortByTime(List<MessageEntity> list) {
@@ -516,8 +546,21 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     }
   }
 
+  void _wireInboxDeliveryToOpenChat(String conversationId) {
+    ConversationsInboxCoordinator.deliverInboxPayloadToOpenChat = (payload) {
+      final cid = (payload['conversation_id'] ?? payload['conversationId'])
+          ?.toString()
+          .trim();
+      if (cid == null || cid.isEmpty || cid != _activeConversationId) {
+        return;
+      }
+      add(ReceiveMessageEvent(Map<String, dynamic>.from(payload)));
+    };
+  }
+
   Future<void> _attachConversationSocket(String conversationId) async {
     if (conversationId.trim().isEmpty) return;
+    _wireInboxDeliveryToOpenChat(conversationId);
     await _socketService.joinConversation(conversationId, (messageData) {
       final dynamic decoded = messageData is String ? jsonDecode(messageData) : messageData;
       if (decoded is Map) {
@@ -537,11 +580,12 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         ? fromEvent
         : (await _storage.read(key: 'userId') ?? '');
 
-    _socketService.setUserInboxSuppressFetchForConversation(event.conversationId);
-
+    _lastReadPatchKey = null;
     _syncFailed = false;
     _deltaSyncInProgress = false;
     _isPartnerTyping = false;
+
+    final outstanding = _copyOutstandingLocalMessages();
 
     await ChatMessagesCache.ensureReady();
     final cached = await ChatMessagesCache.read(event.conversationId);
@@ -549,13 +593,18 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     _messages.clear();
     if (cached.isNotEmpty) {
       _messages.addAll(_sortByTime(cached));
+    }
+    _reappendOutstandingLocals(outstanding);
+    if (_messages.isNotEmpty) {
       _reconcilePartnerLastSeenFromMessages();
       emit(_emitLoaded());
     } else {
       emit(ChatLoadingState());
     }
 
+    _socketService.setUserInboxSuppressFetchForConversation(null);
     await _attachConversationSocket(event.conversationId);
+    _socketService.setUserInboxSuppressFetchForConversation(event.conversationId);
   }
 
   Future<void> _onLoadMessages(LoadMessagesEvent event, Emitter<ChatState> emit) async {
@@ -563,6 +612,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     _activeConversationId = event.conversationId;
     if (event.conversationId.trim() != previousCid) {
       _partnerLastSeenMessageId = null;
+      _lastReadPatchKey = null;
       _isPartnerTyping = false;
     }
     _olderMessagesFullyLoaded = false;
@@ -587,15 +637,22 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
     _pendingRecipientUserId = null;
 
+    _socketService.setUserInboxSuppressFetchForConversation(null);
+    await _attachConversationSocket(event.conversationId);
     _socketService.setUserInboxSuppressFetchForConversation(event.conversationId);
 
     _syncFailed = false;
+    final outstanding = _copyOutstandingLocalMessages();
+
     await ChatMessagesCache.ensureReady();
     final cached = await ChatMessagesCache.read(event.conversationId);
 
     _messages.clear();
     if (cached.isNotEmpty) {
       _messages.addAll(_sortByTime(cached));
+    }
+    _reappendOutstandingLocals(outstanding);
+    if (_messages.isNotEmpty) {
       _deltaSyncInProgress = true;
       emit(_emitLoaded());
     } else {
@@ -633,15 +690,15 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       _messages
         ..clear()
         ..addAll(merged);
+      _reappendOutstandingLocals(outstanding);
       _reconcilePartnerLastSeenFromMessages();
       await _persistMessages(immediate: true);
       _deltaSyncInProgress = false;
       _syncFailed = false;
       emit(_emitLoaded());
-
-      await _attachConversationSocket(event.conversationId);
     } catch (error) {
       _deltaSyncInProgress = false;
+      _reappendOutstandingLocals(outstanding);
       if (_messages.isNotEmpty) {
         _syncFailed = hadCachedMessagesBeforeFetch;
         emit(_emitLoaded());
@@ -678,26 +735,35 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   }
 
   Future<void> _onUpdateReadStatus(UpdateReadStatusEvent event, Emitter<ChatState> emit,) async {
-    try {
+    final cid = event.conversationId.trim();
+    if (cid.isEmpty || event.messageIds.isEmpty) {
+      return;
+    }
+    final patchKey = '$cid:${event.messageIds.join(',')}';
+    if (patchKey == _lastReadPatchKey) {
+      return;
+    }
+    _lastReadPatchKey = patchKey;
 
-      // Mise à jour locale dans _messages
+    try {
+      final dio = DioClient().createDio(baseUrl: Constants.baseUrl);
+      await dio.patch('/api/chat/conversations/$cid/read');
+
       for (var i = 0; i < _messages.length; i++) {
-        if (event.messageIds.contains(_messages[i].id)) {
-          _messages[i] = _messages[i].copyWith(
+        final m = _messages[i];
+        if (m.senderId == _currentUserId) continue;
+        if (event.messageIds.contains(m.id) && m.isRead == 0) {
+          _messages[i] = m.copyWith(
             isRead: 1,
             updatedAt: DateTime.now().toUtc().toIso8601String(),
           );
         }
       }
 
-      // Réémettre l’état avec la liste mise à jour pour mettre à jour les messages sur l'écran
       emit(_emitLoaded());
       await _persistMessages();
-
-      final dio = DioClient().createDio(baseUrl: Constants.baseUrl);
-      await dio.patch('/api/chat/conversations/${event.conversationId}/read');
-
     } catch (error) {
+      _lastReadPatchKey = null;
       emit(ChatErrorState('chat.error.readUpdateFailed', error));
     }
   }
@@ -731,8 +797,22 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     final localPathToPreserve = pending.metadata?['localFilePath'];
 
     final serverMessage = MessageModel.fromJson(data);
+    final pendingTime = DateTime.tryParse(pending.createdAt.trim());
+    final serverTime = DateTime.tryParse(serverMessage.createdAt.trim());
+    var createdAt = serverMessage.createdAt;
+    var updatedAt = serverMessage.updatedAt;
+    if (pendingTime != null &&
+        serverTime != null &&
+        pendingTime.isAfter(serverTime)) {
+      createdAt = pending.createdAt;
+      updatedAt = pending.updatedAt.isNotEmpty
+          ? pending.updatedAt
+          : pending.createdAt;
+    }
     final suturedMessage = serverMessage.copyWith(
       clientId: pending.clientId,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
       metadata: <String, dynamic>{
         ...?serverMessage.metadata,
         if (localPathToPreserve != null &&
@@ -741,6 +821,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       },
     );
     _messages[idx] = suturedMessage;
+    _messages.sort(compareChatMessagesChronological);
 
     final newConvId = data['conversation_id']?.toString();
     if (newConvId != null && newConvId.isNotEmpty) {
@@ -1309,18 +1390,32 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       socketNorm.contains('messagesent') ||
       socketRaw.contains('message.sent') ||
       socketRaw.contains('messagesent');
+  final isConversationReadEvent = socketRaw.contains('conversation.read') ||
+      socketNorm.contains('conversationread');
+
+  // Payload API / Pusher `message.sent` : `type` vaut `text` ou `media` (pas le nom d'événement).
+  // Ne pas utiliser `type.contains('read')` : « media » contient « read » et bloquait l'affichage.
+  final messageKind =
+      (payload['type'] ?? dataSansMeta['type'])?.toString().toLowerCase();
+  final hasMessageId = _nonEmptyIdString(payload['id']) != null;
+  final looksLikeChatMessage = hasMessageId &&
+      (messageKind == 'text' ||
+          messageKind == 'media' ||
+          (payload['content'] != null &&
+              payload['content'].toString().trim().isNotEmpty) ||
+          (payload['media_url'] != null &&
+              payload['media_url'].toString().trim().isNotEmpty));
 
   // 4. Gestion des accusés de lecture (Read Receipts)
-  // On ne le traite comme ReadReceipt QUE SI ce n'est PAS un événement MessageSent
   final hasReadPayloadHint = _nonEmptyIdString(dataSansMeta['last_read_message_id']) != null ||
       _nonEmptyIdString(payload['last_read_message_id']) != null;
 
-  final explicitReadBroadcast = !isMessageSentEvent && (
-      eventType.contains('read') ||
-      eventName.contains('read') ||
-      socketNorm.contains('read') ||
-      hasReadPayloadHint
-  );
+  final explicitReadBroadcast = !isMessageSentEvent &&
+      !looksLikeChatMessage &&
+      (isConversationReadEvent ||
+          socketNorm.contains('conversationread') ||
+          socketNorm.contains('messageread') ||
+          hasReadPayloadHint);
 
   if (explicitReadBroadcast) {
     await _handleSocketReadReceiptEvent(
@@ -1347,9 +1442,8 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     final msgCid = message.conversationId;
     if (msgCid.isNotEmpty && msgCid != active) return;
 
-    final sid = message.senderId.trim();
     final me = _currentUserId.trim();
-    if (sid.isNotEmpty && me.isNotEmpty && sid != me) {
+    if (me.isNotEmpty && !chatSenderIdsMatch(message.senderId, me)) {
       _isPartnerTyping = false;
       _partnerTypingResetTimer?.cancel();
     }

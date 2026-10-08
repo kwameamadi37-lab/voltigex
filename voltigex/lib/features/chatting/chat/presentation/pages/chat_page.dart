@@ -136,6 +136,9 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
   /// Liste inversée : l’utilisateur a remonté dans l’historique (s’éloigne du dernier message).
   bool _showJumpToLatestFab = false;
   static const double _kScrollAwayFromLatestPx = 88;
+  bool _appInForeground = true;
+  Timer? _markReadDebounce;
+  String? _lastMarkReadFingerprint;
 
   Future<void> _appendPickedMedia(List<XFile> files) async {
     if (files.isEmpty) return;
@@ -455,8 +458,6 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
     WidgetsBinding.instance.addObserver(this); // <-- Inscription au cycle de vie
     _scrollController.addListener(_onScrollChatPosition);
 
-    _scrollController.addListener(_onScrollChatPosition);
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final uid = SessionController.instance.userId ?? '';
@@ -551,12 +552,58 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
     _chatBloc ??= BlocProvider.of<ChatBloc>(context);
   }
 
+  bool _isViewingLatestMessages() {
+    if (!_scrollController.hasClients) return false;
+    return _scrollController.position.pixels <= _kScrollAwayFromLatestPx;
+  }
+
+  void _scheduleMarkIncomingAsRead(ChatLoadedState state) {
+    if (!_appInForeground) return;
+    if (state.deltaSyncInProgress) return;
+    final cid = _effectiveConversationId(state);
+    if (cid == null || cid.isEmpty) return;
+    final ids = getMessagesReadId(state.messages, state.currentUserId);
+    if (ids.isEmpty) return;
+    if (!_scrollController.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _scheduleMarkIncomingAsRead(state);
+      });
+      return;
+    }
+    if (!_isViewingLatestMessages()) return;
+
+    final fingerprint = '$cid:${ids.join('|')}';
+    if (fingerprint == _lastMarkReadFingerprint) return;
+
+    _markReadDebounce?.cancel();
+    _markReadDebounce = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted || !_appInForeground) return;
+      if (!_isViewingLatestMessages()) return;
+      final bloc = _chatBloc ?? context.read<ChatBloc>();
+      final st = bloc.state;
+      if (st is! ChatLoadedState || st.deltaSyncInProgress) return;
+      final cidNow = _effectiveConversationId(st);
+      if (cidNow == null || cidNow.isEmpty) return;
+      final idsNow = getMessagesReadId(st.messages, st.currentUserId);
+      if (idsNow.isEmpty) return;
+      final fpNow = '$cidNow:${idsNow.join('|')}';
+      if (fpNow == _lastMarkReadFingerprint) return;
+      _lastMarkReadFingerprint = fpNow;
+      bloc.add(UpdateReadStatusEvent(cidNow, idsNow));
+    });
+  }
+
   void _onScrollChatPosition() {
     if (!mounted || !_scrollController.hasClients) return;
     final pos = _scrollController.position;
     final away = pos.pixels > _kScrollAwayFromLatestPx;
     if (away != _showJumpToLatestFab) {
       setState(() => _showJumpToLatestFab = away);
+    }
+
+    final st = _chatBloc?.state;
+    if (st is ChatLoadedState) {
+      _scheduleMarkIncomingAsRead(st);
     }
 
     // reverse: true → le haut (messages plus anciens) correspond à maxScrollExtent.
@@ -607,6 +654,7 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this); // <-- Désinscription
+    _markReadDebounce?.cancel();
     _typingIdleFalseTimer?.cancel();
     _typingTrueHeartbeatTimer?.cancel();
     _connectivitySyncRetryDebounce?.cancel();
@@ -620,7 +668,15 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _appInForeground = false;
+      _markReadDebounce?.cancel();
+      return;
+    }
     if (state == AppLifecycleState.resumed) {
+      _appInForeground = true;
       // L'application revient en avant-plan : recharger/synchroniser la conversation
       final uid = SessionController.instance.userId ?? '';
       final bloc = _chatBloc ?? context.read<ChatBloc>();
@@ -636,6 +692,11 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
           recipientUserId: widget.recipientUserId,
         ),
       );
+
+      final st = bloc.state;
+      if (st is ChatLoadedState) {
+        _scheduleMarkIncomingAsRead(st);
+      }
     }
   }
 
@@ -740,6 +801,13 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
       setState(() {
         _selectedFiles.clear();
       });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
+    });
   }
 
   @override
@@ -830,15 +898,7 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
                   }
                 }
                 if (state is ChatLoadedState) {
-                  final listOfIds = getMessagesReadId(state.messages, state.currentUserId);
-                  final cid = _effectiveConversationId(state);
-                  if (listOfIds.isNotEmpty &&
-                      cid != null &&
-                      cid.isNotEmpty) {
-                    context.read<ChatBloc>().add(
-                          UpdateReadStatusEvent(cid, listOfIds),
-                        );
-                  }
+                  _scheduleMarkIncomingAsRead(state);
                 }
               },
               child: BlocBuilder<ChatBloc, ChatState>(
@@ -958,7 +1018,7 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
                             ),
                             reverse: true,
                             controller: _scrollController,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                            padding: const EdgeInsets.fromLTRB(10, 12, 10, 16),
                             itemCount: listItemCount,
                             itemBuilder: (context, index) {
                               if (showOlderLoader && index == listToDisplay.length) {
@@ -1229,6 +1289,21 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
     );
   }
 
+  TextStyle _chatMessageTextStyle({required bool isSent}) {
+    return GoogleFonts.inter(
+      fontSize: 15,
+      height: 1.38,
+      fontWeight: FontWeight.w400,
+      color: isSent ? Colors.white : DefaultColors.blackColor,
+    );
+  }
+
+  String _formatMessageTime(String sendAt) {
+    final parsed = DateTime.tryParse(sendAt.trim());
+    if (parsed == null) return '';
+    return DateFormat('HH:mm').format(parsed.toLocal());
+  }
+
   Widget _buildReceivedMessage(
     BuildContext context,
     MessageEntity message, {
@@ -1238,103 +1313,94 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
     required double bubbleTopMargin,
   }) {
     final text = message.content;
-    final sendAt = message.createdAt;
-    final mediaName = message.mediaName;
-    final mediaUrl = message.mediaUrl;
-    final mediaWidth = message.mediaWidth;
-    final mediaHeight = message.mediaHeight;
-    final mediaBlurHash = message.mediaBlurhash;
-
-    // CODE SÉCURISÉ :
-    DateTime parsedDate;
-
-    if (sendAt.toString().trim().isNotEmpty) {
-      // tryParse évite de lever une Exception si le format est invalide
-      parsedDate = DateTime.tryParse(sendAt.toString()) ?? DateTime.now();
-    } else {
-      parsedDate = DateTime.now();
-    }
-
-    final localTime = parsedDate.toLocal();
-    final formattedTime = DateFormat('HH:mm').format(localTime);
+    final formattedTime = _formatMessageTime(message.createdAt);
     const isSentMessage = false;
 
     return Padding(
       padding: EdgeInsets.only(
-        bottom: showTimestamp ? 2 : 0,
+        top: bubbleTopMargin,
+        bottom: showTimestamp ? 10 : 6,
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           SizedBox(
-            width: 30,
+            width: 36,
             child: showAvatarAndName
                 ? CustomUserAvatar(
                     profilePhotoUrl: widget.profilePhotoUrl,
                     role: widget.participantRole,
-                    radius: 14,
+                    radius: 15,
                   )
                 : const SizedBox.shrink(),
           ),
-          SizedBox(width: 6,),
-          Expanded(
+          const SizedBox(width: 8),
+          Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  margin: EdgeInsets.only(top: bubbleTopMargin),
-                  child: ChatBubbleFrame(
-                    isMe: false,
-                    child: _isChatMediaMessage(message)
-                        ? ClipRRect(
-                            borderRadius: bubbleRadius,
-                            child: _buildMedia(
-                              context,
-                              message,
-                              widget.mate,
-                              _resolveMediaDisplayName(message),
-                              mediaUrl ?? '',
-                              mediaWidth,
-                              mediaHeight,
-                              mediaBlurHash,
-                              formattedTime,
-                              isSentMessage,
-                              1,
-                              clipRadius: bubbleRadius,
-                            ),
-                          )
-                        : Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            decoration: BoxDecoration(
-                              borderRadius: bubbleRadius,
-                              color: DefaultColors.receiverMessage,
-                            ),
-                            child: Text(
-                              text ?? '',
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                    color: DefaultColors.blackColor,
-                                  ),
-                            ),
-                          ),
+                if (showAvatarAndName && widget.mate.trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 2, bottom: 4),
+                    child: Text(
+                      widget.mate.trim(),
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
                   ),
+                ChatBubbleFrame(
+                  isMe: false,
+                  child: _isChatMediaMessage(message)
+                      ? ClipRRect(
+                          borderRadius: bubbleRadius,
+                          child: _buildMedia(
+                            context,
+                            message,
+                            widget.mate,
+                            _resolveMediaDisplayName(message),
+                            message.mediaUrl ?? '',
+                            message.mediaWidth,
+                            message.mediaHeight,
+                            message.mediaBlurhash,
+                            formattedTime,
+                            isSentMessage,
+                            1,
+                            clipRadius: bubbleRadius,
+                          ),
+                        )
+                      : Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: bubbleRadius,
+                            color: DefaultColors.receiverMessage,
+                          ),
+                          child: Text(
+                            text ?? '',
+                            style: _chatMessageTextStyle(isSent: false),
+                          ),
+                        ),
                 ),
-                if (showTimestamp) ...[
+                if (showTimestamp && formattedTime.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Padding(
                     padding: const EdgeInsets.only(left: 4),
                     child: Text(
                       formattedTime,
                       style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w300,
+                        fontWeight: FontWeight.w400,
                         fontSize: 11,
                         color: Colors.grey.shade600,
                       ),
                     ),
                   ),
-                SizedBox(height: 12,)
                 ],
-                SizedBox(height: 5,)
               ],
             ),
           ),
@@ -1361,9 +1427,7 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
     final mediaHeight = message.mediaHeight;
     final mediaBlurHash = message.mediaBlurhash;
 
-    final utcTime = DateTime.parse(sendAt);
-    final localTime = utcTime.toLocal();
-    final formattedTime = DateFormat('HH:mm').format(localTime);
+    final formattedTime = _formatMessageTime(sendAt);
     const isSentMessage = true;
     var receiptUi = resolveSentReadReceiptForOutgoingMessage(
       msg: message,
@@ -1378,71 +1442,75 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
         receiptUi == SentReadReceiptUi.sendFailed;
     final showStatusRow = showTimestamp || showReceiptSlot;
 
-    final Widget bubbleMain = Container(
-      margin: EdgeInsets.only(top: bubbleTopMargin),
-      child: _isChatMediaMessage(message)
-          ? ClipRRect(
-              borderRadius: bubbleRadius,
-              child: _buildMedia(
-                context,
-                message,
-                null,
-                _resolveMediaDisplayName(message),
-                mediaUrl ?? '',
-                mediaWidth,
-                mediaHeight,
-                mediaBlurHash,
-                formattedTime,
-                isSentMessage,
-                isSaved,
-                clipRadius: bubbleRadius,
-              ),
-            )
-          : Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                borderRadius: bubbleRadius,
-                color: DefaultColors.senderMessage,
-              ),
-              child: Text(
-                text ?? '',
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
+    final Widget bubbleMain = _isChatMediaMessage(message)
+        ? ClipRRect(
+            borderRadius: bubbleRadius,
+            child: _buildMedia(
+              context,
+              message,
+              null,
+              _resolveMediaDisplayName(message),
+              mediaUrl ?? '',
+              mediaWidth,
+              mediaHeight,
+              mediaBlurHash,
+              formattedTime,
+              isSentMessage,
+              isSaved,
+              clipRadius: bubbleRadius,
             ),
-    );
+          )
+        : Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: bubbleRadius,
+              color: DefaultColors.senderMessage,
+            ),
+            child: Text(
+              text ?? '',
+              style: _chatMessageTextStyle(isSent: true),
+            ),
+          );
 
     return Padding(
       padding: EdgeInsets.only(
-        bottom: showStatusRow ? 2 : 0,
+        top: bubbleTopMargin,
+        bottom: showStatusRow ? 8 : 6,
       ),
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: ChatBubbleFrame(
-          isMe: true,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              bubbleMain,
-              if (showStatusRow) ...[
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    if (showTimestamp)
-                      Text(
-                        formattedTime,
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w300,
-                          fontSize: 11,
-                          color: DefaultColors.blackColor,
-                        ),
-                      ),
-                    if (showTimestamp && showReceiptSlot) const SizedBox(width: 6),
-                    if (showReceiptSlot)
-                      ChatMessengerReadReceiptSlot(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Flexible(
+            child: ChatBubbleFrame(
+              isMe: true,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  bubbleMain,
+                  if (showStatusRow) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        if (showTimestamp && formattedTime.isNotEmpty)
+                          Text(
+                            formattedTime,
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w400,
+                              fontSize: 11,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        if (showTimestamp &&
+                            formattedTime.isNotEmpty &&
+                            showReceiptSlot)
+                          const SizedBox(width: 6),
+                        if (showReceiptSlot)
+                          ChatMessengerReadReceiptSlot(
                         ui: receiptUi,
                         profilePhotoUrl: widget.profilePhotoUrl,
                         participantRole: widget.participantRole,
@@ -1464,13 +1532,14 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
                         isRetryingSend: retryingSendClientIds
                             .contains(message.clientId),
                       ),
+                      ],
+                    ),
                   ],
-                ),
-                const SizedBox(height: 5),
-              ],
-            ],
+                ],
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

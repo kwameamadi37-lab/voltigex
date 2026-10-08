@@ -16,16 +16,23 @@ class TransfersHistoryBloc
 
   final DashboardRepository _repository;
 
+  static const int _minLoadingVisibleMs = 1200;
+
   Future<void> _onInitial(
     LoadTransfersHistoryInitial event,
     Emitter<TransfersHistoryState> emit,
   ) async {
     emit(TransfersHistoryLoading());
+    final sw = Stopwatch()..start();
     try {
       final r = await _repository.fetchTransactionsHistoryPage(
         limit: _pageSize,
         offset: 0,
       );
+      final left = _minLoadingVisibleMs - sw.elapsedMilliseconds;
+      if (left > 0) {
+        await Future<void>.delayed(Duration(milliseconds: left));
+      }
       emit(
         TransfersHistoryLoaded(
           transactions: r.items,
@@ -34,6 +41,10 @@ class TransfersHistoryBloc
         ),
       );
     } catch (e) {
+      final left = _minLoadingVisibleMs - sw.elapsedMilliseconds;
+      if (left > 0) {
+        await Future<void>.delayed(Duration(milliseconds: left));
+      }
       emit(TransfersHistoryError(e.toString()));
     }
   }

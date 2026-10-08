@@ -23,6 +23,7 @@ import 'package:voltigex/features/dashboard/transfer/presentation/pages/transfer
 import 'package:voltigex/features/chatting/chat/presentation/bloc/chat_bloc.dart';
 import 'package:voltigex/core/theme.dart';
 import 'package:voltigex/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:voltigex/features/auth/presentation/pages/admin_web_only_page.dart';
 import 'package:voltigex/features/auth/presentation/pages/login_page.dart';
 import 'package:voltigex/features/auth/presentation/pages/register_page.dart';
 import 'package:voltigex/features/chatting/conversation/domain/usecases/fetch_chat_contacts_use_case.dart';
@@ -228,6 +229,7 @@ class MyApp extends StatelessWidget {
                       create: (_) => sl<ProfileBloc>()..add(LoadProfile()),
                       child: const ProfilPage(),
                     ),
+                '/adminWebOnly': (_) => const AdminWebOnlyPage(),
                 '/conversationPage': (_) => const ConversationsPage(),
               },
             );

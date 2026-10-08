@@ -4,7 +4,7 @@ namespace App\Events;
 
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -12,7 +12,7 @@ use Illuminate\Queue\SerializesModels;
  * Le partenaire a marqué des messages comme lus (PATCH …/read).
  * L’expéditeur reçoit [last_read_message_id] pour déplacer l’avatar « Vu ».
  */
-class ConversationRead implements ShouldBroadcast
+class ConversationRead implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -21,6 +21,11 @@ class ConversationRead implements ShouldBroadcast
         public int $readerUserId,
         public ?int $lastReadMessageId,
     ) {
+    }
+
+    public function broadcastAs(): string
+    {
+        return 'conversation.read';
     }
 
     /**

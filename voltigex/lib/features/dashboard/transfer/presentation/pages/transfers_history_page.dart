@@ -209,6 +209,8 @@ Widget _listVirements(
   return Column(
     children: transfers.map((transfer) {
       final isDeposit = TransactionAmountStyle.isDeposit(transfer);
+      final pct = transfer.progressPercent;
+      final showPct = !isDeposit && pct != null;
       final amountColor = TransactionAmountStyle.amountColor(transfer);
       final amountText = TransactionAmountStyle.formattedAmount(
         transfer,
@@ -281,12 +283,23 @@ Widget _listVirements(
                         textStyle: TextStyle(
                           fontWeight: FontWeight.w500,
                           fontSize: 12.5,
-                          color: isDeposit
-                              ? const Color(0xFF16A34A)
-                              : Colors.grey.shade700,
+                          color: TransactionAmountStyle.subtitleColor(transfer),
                         ),
                       ),
                     ),
+                    if (showPct) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '${pct.round()} %',
+                        style: GoogleFonts.inter(
+                          textStyle: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14.5,
+                            color: DefaultColors.blueBackground,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
                 Text(

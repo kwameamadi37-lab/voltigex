@@ -126,7 +126,7 @@ class _LoginPageState extends State<LoginPage> {
                   listener: (context, state) {
                     if (state is AuthSuccess) {
                       final next = SessionController.instance.isAdminSupport
-                          ? '/conversationPage'
+                          ? '/adminWebOnly'
                           : '/navigationPage';
                       Navigator.pushNamedAndRemoveUntil(
                         context,

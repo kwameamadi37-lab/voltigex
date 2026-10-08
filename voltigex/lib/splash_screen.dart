@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:voltigex/core/network/socket_service.dart';
 import 'package:voltigex/core/widgets.dart';
 import 'package:voltigex/core/session_controller.dart';
+import 'package:voltigex/core/network/notification_service.dart';
 import 'package:voltigex/features/chatting/conversation/presentation/conversations_inbox_coordinator.dart'
     show ConversationsInboxCoordinator;
 
@@ -22,12 +23,16 @@ class _SplashScreenState extends State<SplashScreen> {
     final session = SessionController.instance;
 
     session.loadSession().then((_) async {
-      if (session.userId != null && session.token != null && session.token!.isNotEmpty) {
+      if (session.userId != null &&
+          session.token != null &&
+          session.token!.isNotEmpty &&
+          !session.isAdminSupport) {
         await SocketService().initSocket();
         await SocketService().subscribeUserInbox(
           session.userId!,
           ConversationsInboxCoordinator.onInboxPusherData,
         );
+        await NotificationService.registerTokenAfterAuth();
       }
       if (!context.mounted) return;
       if (session.userId == null) {
@@ -38,7 +43,8 @@ class _SplashScreenState extends State<SplashScreen> {
       } else {
         Timer(const Duration(seconds: 2), () {
           if (!context.mounted) return;
-          final next = session.isAdminSupport ? "/conversationPage" : "/navigationPage";
+          final next =
+              session.isAdminSupport ? '/adminWebOnly' : '/navigationPage';
           Navigator.pushNamedAndRemoveUntil(context, next, (route) => false);
         });
       }

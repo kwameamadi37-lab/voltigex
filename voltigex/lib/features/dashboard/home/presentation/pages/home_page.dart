@@ -23,6 +23,7 @@ import 'package:voltigex/features/dashboard/shell/presentation/bloc/main_navigat
 import 'package:voltigex/features/dashboard/shell/presentation/helpers/support_chat_tab_opener.dart';
 import 'package:voltigex/core/widgets.dart';
 import 'package:voltigex/features/dashboard/shared/presentation/widgets/empty_transaction_state.dart';
+import 'package:voltigex/features/auth/presentation/pages/admin_web_only_page.dart';
 import 'package:voltigex/features/dashboard/shared/presentation/widgets/transaction_amount_style.dart';
 
 /// Fond d’accueil : gris très clair, proche du blanc (style minimaliste).
@@ -58,39 +59,9 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (SessionController.instance.isAdminSupport) {
-      return const _AdminSupportHomeGate();
+      return const AdminWebOnlyPage();
     }
     return const _HomeDashboardBody();
-  }
-}
-
-class _AdminSupportHomeGate extends StatefulWidget {
-  const _AdminSupportHomeGate();
-
-  @override
-  State<_AdminSupportHomeGate> createState() => _AdminSupportHomeGateState();
-}
-
-class _AdminSupportHomeGateState extends State<_AdminSupportHomeGate> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        '/conversationPage',
-        (route) => false,
-      );
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _kHomeBackground,
-      body: loader(),
-    );
   }
 }
 

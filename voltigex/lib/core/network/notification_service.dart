@@ -14,7 +14,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:voltigex/core/constants.dart';
 import 'package:voltigex/core/locale/app_locale_storage.dart';
 import 'package:voltigex/core/session_controller.dart';
-import 'package:voltigex/features/chatting/chat/presentation/pages/chat_page.dart';
+import 'package:voltigex/features/chatting/chat/presentation/bloc/chat_bloc.dart';
+import 'package:voltigex/features/chatting/chat/presentation/bloc/chat_event.dart';
+import 'package:voltigex/features/chatting/chat/presentation/bloc/chat_state.dart';
 import 'package:voltigex/features/chatting/conversation/presentation/bloc/conversations_bloc.dart';
 import 'package:voltigex/features/chatting/conversation/presentation/bloc/conversations_event.dart';
 import 'package:voltigex/features/dashboard/shell/presentation/bloc/main_navigation_cubit.dart';
@@ -30,7 +32,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   // debugPrint('[fcm_background] Message reçu: ${message.messageId}');
 
-  if (message.notification == null && message.data.isNotEmpty) {
+  if (message.data.isNotEmpty) {
     final FlutterLocalNotificationsPlugin backgroundNotificationsPlugin =
         FlutterLocalNotificationsPlugin();
 
@@ -46,10 +48,17 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(backgroundChannel);
 
+    final title = message.notification?.title ??
+        message.data['senderName']?.toString() ??
+        'Support';
+    final body = message.notification?.body ??
+        message.data['content']?.toString() ??
+        'Nouveau message';
+
     await backgroundNotificationsPlugin.show(
       message.hashCode,
-      message.data['title'] ?? 'Nouveau message',
-      message.data['body'] ?? '',
+      title,
+      body,
       NotificationDetails(
         android: AndroidNotificationDetails(
           backgroundChannel.id,
@@ -68,9 +77,18 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// SERVICE DE NOTIFICATION
 /// ----------------------------------------------------------------------------
 class NotificationService {
+  static NotificationService? _instance;
+
+  /// Enregistrement FCM après login / restauration de session.
+  static Future<void> registerTokenAfterAuth() async {
+    await _instance?.syncFcmTokenWithBackend();
+  }
+
   final GlobalKey<NavigatorState> navigatorKey;
 
-  NotificationService({required this.navigatorKey});
+  NotificationService({required this.navigatorKey}) {
+    _instance = this;
+  }
 
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -128,6 +146,41 @@ class NotificationService {
     }
   }
 
+  Future<void> syncFcmTokenWithBackend() async {
+    if (SessionController.instance.isAdminSupport) return;
+
+    final fcmToken = await _firebaseMessaging.getToken();
+    if (fcmToken == null || fcmToken.isEmpty) return;
+
+    const storage = FlutterSecureStorage();
+    final token = await storage.read(key: 'token');
+    if (token == null || token.isEmpty) return;
+
+    try {
+      final response = await http.post(
+        Uri.parse('${Constants.backendServerAddress}/api/user/fcm-token'),
+        body: jsonEncode({
+          'fcm_token': fcmToken,
+          'device_type': Platform.isAndroid
+              ? 'android'
+              : (Platform.isIOS ? 'ios' : 'web'),
+        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      if (response.statusCode >= 400) {
+        debugPrint(
+          '[fcm_token] API ${response.statusCode}: ${response.body}',
+        );
+      }
+    } catch (e) {
+      debugPrint('[fcm_token_send_error] $e');
+    }
+  }
+
   /// Initialisation complète de FCM
   Future<void> initFCM() async {
     // 1. Enregistrement du Handler d'arrière-plan FCM
@@ -140,42 +193,24 @@ class NotificationService {
       sound: true,
     );
 
+    if (Platform.isAndroid) {
+      await flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
+    }
+
     await _firebaseMessaging.setForegroundNotificationPresentationOptions(
       alert: true,
       badge: true,
       sound: true,
     );
 
-    // 3. Envoi du Token FCM au Backend
-    final deviceId = await getDeviceId();
-    // debugPrint('[device_id] $deviceId');
+    await syncFcmTokenWithBackend();
 
-    final String baseUrl = Constants.backendServerAddress;
-    final fcmToken = await _firebaseMessaging.getToken();
-    // debugPrint('[fcm_token] $fcmToken');
-
-    if (fcmToken != null) {
-      const storage = FlutterSecureStorage();
-      final token = await storage.read(key: 'token');
-      try {
-        await http.post(
-          Uri.parse('$baseUrl/api/user/fcm-token'),
-          body: jsonEncode({
-            'fcm_token': fcmToken,
-            'device_type': Platform.isAndroid
-                ? 'android'
-                : (Platform.isIOS ? 'ios' : 'web'),
-          }),
-          headers: {
-            'Content-Type': 'application/json',
-            if (token != null && token.isNotEmpty)
-              'Authorization': 'Bearer $token',
-          },
-        );
-      } catch (e) {
-        // debugPrint('[fcm_token_send_error] $e');
-      }
-    }
+    _firebaseMessaging.onTokenRefresh.listen((_) {
+      syncFcmTokenWithBackend();
+    });
 
     // 4. Configuration Notifications Locales Android
     const AndroidInitializationSettings initializationSettingsAndroid =
@@ -206,24 +241,35 @@ class NotificationService {
 
     // 5. Réception de messages en Premier Plan (Foreground)
     FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-      // debugPrint('[fcm_foreground] ${message.data}');
-      final conversationId = (message.data['conversation_id'] ??
-              message.data['conversationId'] ??
+      if (SessionController.instance.isAdminSupport) return;
+
+      final data = Map<String, dynamic>.from(message.data);
+      final conversationId = (data['conversation_id'] ??
+              data['conversationId'] ??
               '')
           .toString();
 
+      final senderId = (data['sender_id'] ?? data['senderId'] ?? '')
+          .toString();
+      final senderName = message.notification?.title?.toString() ??
+          data['senderName']?.toString() ??
+          'Support';
+      final content = message.notification?.body?.toString() ??
+          data['content']?.toString() ??
+          '';
+
       await showMessagingStyleNotification(
         conversationId: conversationId,
-        senderId: (message.data['senderId'] ?? '').toString(),
-        senderName:
-            message.notification?.title ?? message.data['senderName'] ?? '',
-        senderImage: message.data['senderImage'] ?? '',
-        content: message.notification?.body ?? message.data['content'] ?? '',
-        data: message.data,
+        senderId: senderId,
+        senderName: senderName,
+        senderImage: data['senderImage']?.toString() ?? '',
+        content: content.isNotEmpty ? content : 'Nouveau message',
+        data: data,
       );
 
       if (conversationId.isNotEmpty) {
         _requestConversationsRefresh();
+        _requestChatDeltaSync(conversationId);
       }
     });
 
@@ -321,6 +367,27 @@ class NotificationService {
     } catch (_) {}
   }
 
+  void _requestChatDeltaSync(String conversationId) {
+    final cid = conversationId.trim();
+    if (cid.isEmpty) return;
+    final ctx = navigatorKey.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+    try {
+      final chatState = ctx.read<ChatBloc>().state;
+      // Évite un rechargement complet qui efface les brouillons / désordonne le fil.
+      if (chatState is ChatLoadedState && chatState.deltaSyncInProgress) {
+        return;
+      }
+      final uid = SessionController.instance.userId ?? '';
+      ctx.read<ChatBloc>().add(
+            LoadMessagesEvent(
+              cid,
+              currentUserId: uid.isNotEmpty ? uid : null,
+            ),
+          );
+    } catch (_) {}
+  }
+
   void _handleNotificationClick(String payload) {
     try {
       final data = jsonDecode(payload);
@@ -342,21 +409,9 @@ class NotificationService {
     final ctx = navigatorKey.currentContext;
     if (ctx == null || !ctx.mounted) return;
 
-    final l10n = AppLocalizations.of(ctx)!;
+    if (SessionController.instance.isAdminSupport) return;
 
-    if (SessionController.instance.isAdminSupport) {
-      navigatorKey.currentState?.push(
-        MaterialPageRoute<void>(
-          builder: (context) => ChatPage(
-            conversationId: conversationId,
-            mate: mate.isNotEmpty ? mate : l10n.conversationsTitleMessages,
-            profilePhotoUrl: profilePhotoUrl,
-            participantRole: participantRole,
-          ),
-        ),
-      );
-      return;
-    }
+    final l10n = AppLocalizations.of(ctx)!;
 
     navigatorKey.currentState?.popUntil((route) => route.isFirst);
     ctx.read<MainNavigationCubit>().openChatTab(

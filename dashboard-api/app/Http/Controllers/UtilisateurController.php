@@ -45,6 +45,23 @@ class UtilisateurController extends Controller
             ->limit($limit)
             ->get();
 
+        $userVirements = DB::table('virements')
+            ->where('user_id', $userId)
+            ->get();
+
+        $historiques = $historiques->map(function ($h) use ($userVirements) {
+            $row = (array) $h;
+            if ($this->historiqueLooksLikeVirement($h)) {
+                $match = $this->matchVirementForHistorique($userVirements, $h);
+                if ($match !== null) {
+                    $row['pourcentage'] = $match->pourcentage;
+                    $row['virement_statut'] = $match->statut;
+                }
+            }
+
+            return (object) $row;
+        });
+
         $hasMore = ($offset + $historiques->count()) < $total;
 
         $devise = DB::table('users')->where('id', $userId)->value('devise');
@@ -585,6 +602,58 @@ class UtilisateurController extends Controller
     public function virementSuccess()
     {
         return view('utilisateur.success-code');
+    }
+
+    private function historiqueLooksLikeVirement(object $h): bool
+    {
+        $title = mb_strtolower((string) ($h->titre ?? ''));
+
+        return str_contains($title, 'virement vers')
+            || str_contains($title, 'transfert');
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, object>  $virements
+     */
+    private function matchVirementForHistorique($virements, object $h): ?object
+    {
+        $amount = $this->normalizeHistoriqueAmount($h->montant ?? 0);
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $candidates = $virements->filter(function ($v) use ($amount) {
+            return abs($this->normalizeHistoriqueAmount($v->montant ?? 0) - $amount) < 0.01;
+        });
+
+        if ($candidates->isEmpty()) {
+            return null;
+        }
+
+        $hTs = strtotime((string) ($h->created_at ?? $h->date_transaction ?? ''));
+        if ($hTs === false) {
+            return $candidates->sortByDesc('created_at')->first();
+        }
+
+        return $candidates->sortBy(function ($v) use ($hTs) {
+            $vTs = strtotime((string) ($v->created_at ?? ''));
+            if ($vTs === false) {
+                return PHP_INT_MAX;
+            }
+
+            return abs($vTs - $hTs);
+        })->first();
+    }
+
+    private function normalizeHistoriqueAmount(mixed $montant): float
+    {
+        if (is_numeric($montant)) {
+            return (float) $montant;
+        }
+        $s = preg_replace('/[^\d.,-]/', '', (string) $montant) ?? '';
+        $s = str_replace(',', '.', $s);
+
+        return (float) $s;
     }
 
 }

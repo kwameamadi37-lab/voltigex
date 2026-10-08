@@ -5,6 +5,8 @@
   "buttonOk": "OK",
   "buttonCancel": "Annulla",
   "buttonRetry": "Riprova",
+  "adminWebOnlyTitle": "Area admin sul web",
+  "adminWebOnlyBody": "La chat di supporto clienti è disponibile solo sul portale admin web. Usa un browser sul computer per rispondere ai messaggi.",
   "languageUpdatedSuccess": "Lingua aggiornata con successo",
   "languageSelectionTitle": "Lingua",
   "languageNameFr": "Francese",

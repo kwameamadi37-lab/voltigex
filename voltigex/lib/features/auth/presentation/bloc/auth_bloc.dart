@@ -12,6 +12,7 @@ import 'package:voltigex/features/chatting/conversation/domain/usecases/check_or
 import 'package:voltigex/features/dashboard/shell/presentation/helpers/support_conversation_storage.dart';
 import 'package:voltigex/features/auth/presentation/bloc/auth_event.dart';
 import 'package:voltigex/features/auth/presentation/bloc/auth_state.dart';
+import 'package:voltigex/core/network/notification_service.dart';
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final RegisterUseCase registerUserCase;
   final LoginUseCase loginUseCase;
@@ -44,8 +45,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final session = SessionController.instance;
       session.setSession(user.id, user.token, role: user.role);
 
-      await _socketService.initSocket(forceReconnect: true);
-      await _persistSupportConversationIdIfClient();
+      if (session.isAdminSupport) {
+        await SocketService.instance.disconnect();
+      } else {
+        await _socketService.initSocket(forceReconnect: true);
+        await NotificationService.registerTokenAfterAuth();
+        await _persistSupportConversationIdIfClient();
+      }
       emit(AuthSuccess(message: 'auth.success.login'));
 
     } catch (e) {

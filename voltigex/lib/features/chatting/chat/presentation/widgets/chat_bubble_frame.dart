@@ -16,7 +16,7 @@ class ChatBubbleFrame extends StatelessWidget {
   });
 
   static double maxBubbleWidth(BuildContext context) {
-    return MediaQuery.sizeOf(context).width * 0.75;
+    return MediaQuery.sizeOf(context).width * 0.82;
   }
 
   @override

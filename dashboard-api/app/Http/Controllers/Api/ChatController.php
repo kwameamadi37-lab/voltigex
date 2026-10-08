@@ -7,7 +7,7 @@ use App\Events\MessageSent;
 use App\Events\UserTyping;
 use App\Helpers\MessageMetadataHelper;
 use App\Http\Controllers\Controller;
-use App\Jobs\SendChatMessageNotification;
+use App\Services\ChatPushNotificationService;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
@@ -443,7 +443,7 @@ class ChatController extends Controller
 
         $recipientUser = $conversation->otherParticipant((int) $user->id);
         if ($recipientUser) {
-            SendChatMessageNotification::dispatch($message, $recipientUser);
+            app(ChatPushNotificationService::class)->send($message, $recipientUser);
         }
 
         $metaOut = $message->metadata;
@@ -820,7 +820,7 @@ class ChatController extends Controller
         
         if ($recipient) {
             
-            SendChatMessageNotification::dispatch($message, $recipient);
+            app(ChatPushNotificationService::class)->send($message, $recipient);
         }
 
         $metaOut = $message->metadata;

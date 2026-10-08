@@ -485,10 +485,29 @@
         startMessagesPolling();
     }
 
-    function refreshMessagesForCurrentConversation() {
+    function markCurrentConversationRead() {
         if (!currentConversationId) return;
+        $.ajax({
+            url: '/api/chat/conversations/' + currentConversationId + '/read',
+            method: 'PATCH',
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        }).always(function () {
+            loadConversations();
+        });
+    }
+
+    function refreshMessagesForCurrentConversation(options) {
+        if (!currentConversationId) return;
+        const skipMarkRead = options && options.skipMarkRead;
         $.getJSON('/api/chat/conversations/' + currentConversationId, function (res) {
             renderMessages(res);
+            if (!skipMarkRead) {
+                markCurrentConversationRead();
+            }
         });
     }
 
@@ -540,6 +559,15 @@
         channel.bind('message.sent', handler);
         channel.bind('App\\Events\\MessageSent', handler);
         channel.bind('MessageSent', handler);
+
+        const onConversationRead = function () {
+            if (currentConversationId) {
+                refreshMessagesForCurrentConversation({ skipMarkRead: true });
+            }
+        };
+        channel.bind('conversation.read', onConversationRead);
+        channel.bind('App\\Events\\ConversationRead', onConversationRead);
+        channel.bind('ConversationRead', onConversationRead);
     }
 
     function subscribePrivateChannel(channelName) {

@@ -5,6 +5,8 @@
   "buttonOk": "OK",
   "buttonCancel": "Abbrechen",
   "buttonRetry": "Erneut versuchen",
+  "adminWebOnlyTitle": "Admin-Bereich im Web",
+  "adminWebOnlyBody": "Der Kunden-Support-Chat ist nur im Web-Admin-Portal verfügbar. Bitte antworte über einen Browser am Computer.",
   "languageUpdatedSuccess": "Sprache erfolgreich aktualisiert",
   "languageSelectionTitle": "Sprache",
   "languageNameFr": "Französisch",

@@ -107,7 +107,7 @@ BorderRadius _bubbleRadiusReceived({
 
 /// Même expéditeur et écart **strictement inférieur** à [kMessengerShowTimestampGapSeconds] (120 s) : rafale serrée.
 bool _isTightVisualGroupPair(MessageEntity older, MessageEntity newer) {
-  if (older.senderId != newer.senderId) return false;
+  if (!chatSenderIdsMatch(older.senderId, newer.senderId)) return false;
   final tOld = DateTime.tryParse(older.createdAt)?.toUtc();
   final tNew = DateTime.tryParse(newer.createdAt)?.toUtc();
   if (tOld == null || tNew == null) return false;
@@ -149,7 +149,9 @@ List<ChatListItem> _applyMessengerShowTimestamps(
         _previousNewerMessageInDisplayOrder(displayNewestFirst, i);
     final isTightWithNewer =
         previousNewer != null && _isTightVisualGroupPair(it.message!, previousNewer);
-    final showTs = !isTightWithNewer;
+    // Toujours afficher l’heure sur le message le plus récent du fil (bas de l’écran).
+    final isNewestInThread = i == 0;
+    final showTs = isNewestInThread || !isTightWithNewer;
     out.add(
       ChatListItem.message(
         message: it.message!,
@@ -251,7 +253,7 @@ ChatListBuildResult buildChatListItems({
     final sameNext = next != null && _isTightVisualGroupPair(msg, next);
 
     final isBot = msg.senderId == botId;
-    final isSent = msg.senderId == userId && !isBot;
+    final isSent = messageIsFromCurrentUser(msg, userId, botId: botId);
     final sentReadReceipt = isSent
         ? resolveSentReadReceiptForOutgoingMessage(
             msg: msg,

@@ -24,6 +24,13 @@ class AppLocalizationsIt extends AppLocalizations {
   String get buttonRetry => 'Riprova';
 
   @override
+  String get adminWebOnlyTitle => 'Area admin sul web';
+
+  @override
+  String get adminWebOnlyBody =>
+      'La chat di supporto clienti è disponibile solo sul portale admin web. Usa un browser sul computer per rispondere ai messaggi.';
+
+  @override
   String get languageUpdatedSuccess => 'Lingua aggiornata con successo';
 
   @override

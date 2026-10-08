@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:voltigex/features/chatting/chat/domain/entiies/message_entity.dart';
 import 'package:voltigex/features/chatting/conversation/presentation/bloc/conversations_bloc.dart';
 import 'package:voltigex/features/chatting/conversation/presentation/bloc/conversations_event.dart';
@@ -7,6 +9,9 @@ class ConversationsInboxCoordinator {
   ConversationsInboxCoordinator._();
 
   static ConversationsBloc? _bloc;
+
+  /// Si le chat est ouvert sur cette conversation, injecte le payload Pusher inbox dans le fil.
+  static void Function(Map<String, dynamic> payload)? deliverInboxPayloadToOpenChat;
 
   static void attach(ConversationsBloc bloc) {
     _bloc = bloc;
@@ -19,6 +24,20 @@ class ConversationsInboxCoordinator {
   }
 
   static void onInboxPusherData(dynamic data) {
+    try {
+      Map<String, dynamic>? map;
+      if (data is String) {
+        map = Map<String, dynamic>.from(
+          (jsonDecode(data) as Map).map((k, v) => MapEntry(k.toString(), v)),
+        );
+      } else if (data is Map) {
+        map = Map<String, dynamic>.from(data);
+      }
+      if (map != null && map.isNotEmpty) {
+        deliverInboxPayloadToOpenChat?.call(map);
+      }
+    } catch (_) {}
+
     _bloc?.add(InboxPusherPatchEvent(data));
   }
 

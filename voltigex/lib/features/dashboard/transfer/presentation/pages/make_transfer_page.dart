@@ -64,7 +64,7 @@ class _TransferProgressGaugeState extends State<_TransferProgressGauge>
   bool _awaitingRealProgress = false;
 
   /// Durée max d’une transition 0→100 % (×3 par rapport à l’ancienne ~3,5 s).
-  static const int _maxSweepMs = 10500;
+  static const int _maxSweepMs = 14000;
   static const Curve _curve = Cubic(0.22, 0.92, 0.18, 1.0);
 
   @override
@@ -297,23 +297,25 @@ class _MakeTransferPageState extends State<MakeTransferPage>
     _loadRecipients();
   }
 
+  static const int _recipientsMinLoadMs = 1200;
+  static const int _recipientsMinPullRefreshMs = 900;
+
   /// [fromPullRefresh] : pas d’écran de chargement plein ; durée mini pour calmer le [RefreshIndicator].
   Future<void> _loadRecipients({bool fromPullRefresh = false}) async {
     if (!fromPullRefresh) {
       setState(() => _recipientsLoading = true);
     }
     final sw = Stopwatch()..start();
+    final minMs =
+        fromPullRefresh ? _recipientsMinPullRefreshMs : _recipientsMinLoadMs;
     try {
       final page = await sl<TransferRepository>().fetchRecentRecipients(
         page: 1,
         perPage: _recentRecipientsPageSize,
       );
-      if (fromPullRefresh) {
-        const minPullMs = 700;
-        final left = minPullMs - sw.elapsedMilliseconds;
-        if (left > 0) {
-          await Future<void>.delayed(Duration(milliseconds: left));
-        }
+      final left = minMs - sw.elapsedMilliseconds;
+      if (left > 0) {
+        await Future<void>.delayed(Duration(milliseconds: left));
       }
       if (mounted) {
         setState(() {
@@ -325,12 +327,9 @@ class _MakeTransferPageState extends State<MakeTransferPage>
         });
       }
     } catch (_) {
-      if (fromPullRefresh) {
-        const minPullMs = 700;
-        final left = minPullMs - sw.elapsedMilliseconds;
-        if (left > 0) {
-          await Future<void>.delayed(Duration(milliseconds: left));
-        }
+      final left = minMs - sw.elapsedMilliseconds;
+      if (left > 0) {
+        await Future<void>.delayed(Duration(milliseconds: left));
       }
       if (mounted) {
         setState(() {
@@ -438,9 +437,9 @@ class _MakeTransferPageState extends State<MakeTransferPage>
         });
   }
 
-  static const int _loaderFullSweepMs = 10500;
+  static const int _loaderFullSweepMs = 14000;
   static const int _loaderSuspenseAfterTargetSeconds = 4;
-  static const int _loaderMinVisibleZeroProgressMs = 2200;
+  static const int _loaderMinVisibleZeroProgressMs = 3200;
 
   /// Attend que la jauge ait eu le temps d’atteindre [finalProgressPercent], puis un suspense fixe.
   Future<void> _awaitLoaderAnimationAndSuspense(
@@ -1048,11 +1047,22 @@ class _MakeTransferPageState extends State<MakeTransferPage>
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
+                    '${r.progressPercent.round()} %',
+                    style: GoogleFonts.inter(
+                      textStyle: TextStyle(
+                        fontSize: 16.0,
+                        fontWeight: FontWeight.w800,
+                        color: DefaultColors.blueBackground,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
                     r.listOutcomeLabel,
                     style: GoogleFonts.inter(
                       textStyle: TextStyle(
-                        fontSize: 13.0,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 12.0,
+                        fontWeight: FontWeight.w600,
                         color: Colors.deepOrange.shade700,
                       ),
                     ),
@@ -1065,15 +1075,30 @@ class _MakeTransferPageState extends State<MakeTransferPage>
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(bottom: 2),
-                    child: Text(
-                      r.listOutcomeLabel,
-                      style: GoogleFonts.inter(
-                        textStyle: TextStyle(
-                          fontSize: 13.0,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.deepOrange.shade700,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${r.progressPercent.round()} %',
+                          style: GoogleFonts.inter(
+                            textStyle: TextStyle(
+                              fontSize: 16.0,
+                              fontWeight: FontWeight.w800,
+                              color: DefaultColors.blueBackground,
+                            ),
+                          ),
                         ),
-                      ),
+                        Text(
+                          r.listOutcomeLabel,
+                          style: GoogleFonts.inter(
+                            textStyle: TextStyle(
+                              fontSize: 12.0,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.deepOrange.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   TextButton.icon(

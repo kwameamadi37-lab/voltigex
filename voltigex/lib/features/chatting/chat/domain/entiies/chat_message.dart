@@ -3,17 +3,47 @@ import 'package:voltigex/features/chatting/chat/domain/entiies/message_entity.da
 /// Alias domaine pour un message de conversation.
 typedef ChatMessage = MessageEntity;
 
+/// Compare les ids expéditeur / utilisateur courant (API int vs stockage string).
+bool chatSenderIdsMatch(String? a, String? b) {
+  final x = (a ?? '').trim();
+  final y = (b ?? '').trim();
+  if (x.isEmpty || y.isEmpty) return false;
+  if (x == y) return true;
+  final xn = int.tryParse(x);
+  final yn = int.tryParse(y);
+  return xn != null && yn != null && xn == yn;
+}
+
+bool messageIsFromCurrentUser(
+  MessageEntity message,
+  String currentUserId, {
+  String botId = '00000000-0000-0000-0000-000000000000',
+}) {
+  if (message.senderId == botId) return false;
+  return chatSenderIdsMatch(message.senderId, currentUserId);
+}
+
 /// Tri chronologique croissant avec repli sur l’id serveur puis [clientId].
 int compareChatMessagesChronological(MessageEntity a, MessageEntity b) {
-  try {
-    final c = DateTime.parse(a.createdAt).compareTo(DateTime.parse(b.createdAt));
+  final ta = DateTime.tryParse(a.createdAt.trim());
+  final tb = DateTime.tryParse(b.createdAt.trim());
+  if (ta != null && tb != null) {
+    final c = ta.compareTo(tb);
     if (c != 0) return c;
-  } catch (_) {
-    return 0;
+  } else if (ta != null) {
+    return 1;
+  } else if (tb != null) {
+    return -1;
   }
-  final idA = int.tryParse(a.id) ?? 0;
-  final idB = int.tryParse(b.id) ?? 0;
-  if (idA != idB) return idA.compareTo(idB);
+
+  final idA = int.tryParse(a.id.trim());
+  final idB = int.tryParse(b.id.trim());
+  if (idA != null && idB != null && idA != idB) {
+    return idA.compareTo(idB);
+  }
+  if (idA != null && idB == null) return -1;
+  if (idA == null && idB != null) return 1;
+
   return a.clientId.compareTo(b.clientId);
 }
 
