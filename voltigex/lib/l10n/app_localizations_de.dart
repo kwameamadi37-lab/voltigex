@@ -129,6 +129,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get loginRegisterPromptSubtitle => 'Hier tippen, um eines anzulegen.';
 
   @override
+  String get loginForgotPassword => 'Passwort vergessen?';
+
+  @override
   String get registerHintUsername => 'Benutzername';
 
   @override
@@ -269,14 +272,38 @@ class AppLocalizationsDe extends AppLocalizations {
   String get homeSuggestedForYou => 'Für Sie vorgeschlagen';
 
   @override
-  String get homeFraudAlertTitle => 'Vorsicht vor Betrug';
+  String get homeFraudAlertTitle => 'Ihre Sicherheit an erster Stelle';
 
   @override
-  String get homeFraudAlertBody =>
-      'Voltigex wird Sie niemals per Telefon, SMS oder E-Mail nach Passwort, Bestätigungscode oder dringender Überweisung fragen. Im Zweifel kontaktieren Sie den Support in der App.';
+  String get homeFraudAlertIntro =>
+      'Bei Voltigex hat Ihre Sicherheit höchste Priorität. Wir setzen moderne Methoden und Spitzentechnologie ein, um Qualität, Sicherheit und Schutz Ihrer Transaktionen zu gewährleisten.';
+
+  @override
+  String get homeFraudAlertFeature1Title => 'Erweiterte Betrugserkennung';
+
+  @override
+  String get homeFraudAlertFeature1Body =>
+      'Unser KI-System analysiert alle Transaktionen in Echtzeit, um Betrugsversuche zu erkennen und zu verhindern, bevor sie eintreten.';
+
+  @override
+  String get homeFraudAlertFeature2Title => 'Verschlüsselung auf Bankniveau';
+
+  @override
+  String get homeFraudAlertFeature2Body =>
+      'Alle Ihre Daten sind mit AES-256-Verschlüsselung geschützt – dem Standard der sichersten Finanzinstitute weltweit.';
+
+  @override
+  String get homeFraudAlertFeature3Title => 'Überwachung 24/7';
+
+  @override
+  String get homeFraudAlertFeature3Body =>
+      'Unser Sicherheitsteam überwacht Ihr Konto rund um die Uhr, um verdächtige Aktivitäten zu erkennen und Sie vor Betrug zu schützen.';
 
   @override
   String get homeFraudAlertCta => 'Support kontaktieren';
+
+  @override
+  String get homeFraudAlertBadge => 'Sicherheit';
 
   @override
   String get homePromoTitle => 'Voltigex Days!';
@@ -666,7 +693,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get cardsAddMoneyBody =>
-      'Auf die Karte eingezahltes Geld kann nicht abgehoben oder gesendet werden. Sie können es nur für Kartenzahlungen nutzen.';
+      'Guthaben auf Ihrer Karte kann in manchen Fällen abgehoben oder auf ein anderes Konto überwiesen werden. Dies hängt von den geltenden Vorschriften und Gesetzen in Ihrem Land oder Ihrer Region ab.';
 
   @override
   String get cardsUnderstood => 'Verstanden';
@@ -694,6 +721,15 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get cardsActivateDialogTitle => 'Karte aktivieren';
+
+  @override
+  String get cardsActivateTypeLabel => 'Kartentyp';
+
+  @override
+  String get cardsActivateTypeRequired => 'Bitte wählen Sie einen Kartentyp.';
+
+  @override
+  String get cardsActivateAmountLabel => 'Zugehöriger Betrag';
 
   @override
   String get cardsHolderLabel => 'Karteninhaber';

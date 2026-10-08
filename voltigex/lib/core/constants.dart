@@ -1,5 +1,5 @@
 class Constants {
-  static const String backendServerAddress = "http://192.168.100.8:8000";
+  static const String backendServerAddress = "http://192.168.1.76:8000";
 
   /// Même base que [backendServerAddress] — utilisée pour reconstruire les URLs médias affichées.
   static String get baseUrl => backendServerAddress;

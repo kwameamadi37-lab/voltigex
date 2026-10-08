@@ -51,8 +51,11 @@ class SocketService {
   }
 
   bool _isMessageSentEvent(String? name) {
+    if (name == null || name.isEmpty) return false;
+    final raw = name.trim().toLowerCase();
+    if (raw == 'message.sent' || raw.endsWith('.message.sent')) return true;
     final normalized = _normalizeEventName(name);
-    return normalized == 'messagesent' || normalized == 'message.sent' || normalized == 'messagesentevent';
+    return normalized == 'messagesent' || normalized == 'messagesentevent';
   }
 
   bool _isMessageReadEvent(String? name) {
@@ -76,10 +79,9 @@ class SocketService {
     if (s.contains(r'\\')) {
       s = s.split(r'\\').last;
     }
-    if (s.contains('.')) {
-      s = s.split('.').last;
-    }
-    return s.toLowerCase();
+    // `message.sent` (broadcastAs) → messagesent — ne pas garder seulement « sent »
+    s = s.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
+    return s;
   }
 
   /// Enveloppe les données du canal conversation pour que le [ChatBloc] connaisse le nom Pusher réel
@@ -308,6 +310,9 @@ class SocketService {
       await disconnect();
     }
     if (_pusher != null) {
+      try {
+        await _pusher!.connect();
+      } catch (_) {}
       return;
     }
 
@@ -363,12 +368,17 @@ class SocketService {
         }
 
         final isReadEvent = _isMessageReadEvent(event.eventName);
+        final isSent = _isMessageSentEvent(event.eventName);
+        final activeConvChannel = _activeConversationId != null && _activeConversationId!.isNotEmpty
+            ? 'private-chat.$_activeConversationId'
+            : null;
 
-        // 1. Événement dédié à la vue Chat active
-        if (_conversationChannelName != null &&
-            event.channelName == _conversationChannelName &&
-            (_isMessageSentEvent(event.eventName) || isReadEvent)) {
-          _conversationHandler?.call(
+        // 1. Vue chat ouverte : canal `private-chat.{conversationId}` (direct ou typing watch)
+        if (activeConvChannel != null &&
+            event.channelName == activeConvChannel &&
+            (isSent || isReadEvent) &&
+            _conversationHandler != null) {
+          _conversationHandler!.call(
             _conversationEnvelope(event.eventName, event.data),
           );
           return;
@@ -384,14 +394,25 @@ class SocketService {
 
         if (_userInboxChannelName != null && event.channelName == _userInboxChannelName) {
           final cid = _conversationIdFromMessagePayload(event.data);
-          // debugPrint('📥 [User Inbox Event] ConvID reçu: $cid \vert{} SuppressID:$_userInboxSuppressFetchConversationId');
 
-          if (cid != null && cid == _userInboxSuppressFetchConversationId) {
-            // debugPrint('⚠️ [User Inbox Event] Ignoré car conversation active dans l\'écran chat.');
+          if (cid != null &&
+              cid == _userInboxSuppressFetchConversationId &&
+              cid == _activeConversationId &&
+              isSent &&
+              _conversationHandler != null) {
+            _conversationHandler!.call(
+              _conversationEnvelope(event.eventName, event.data),
+            );
             return;
           }
 
-          _userInboxHandler?.call(event.data);
+          if (cid != null && cid == _userInboxSuppressFetchConversationId) {
+            return;
+          }
+
+          if (isSent) {
+            _userInboxHandler?.call(event.data);
+          }
           return;
         }
 

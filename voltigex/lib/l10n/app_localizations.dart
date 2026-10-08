@@ -344,6 +344,12 @@ abstract class AppLocalizations {
   /// **'Tocca qui per crearne uno.'**
   String get loginRegisterPromptSubtitle;
 
+  /// No description provided for @loginForgotPassword.
+  ///
+  /// In it, this message translates to:
+  /// **'Password dimenticata?'**
+  String get loginForgotPassword;
+
   /// No description provided for @registerHintUsername.
   ///
   /// In it, this message translates to:
@@ -623,20 +629,62 @@ abstract class AppLocalizations {
   /// No description provided for @homeFraudAlertTitle.
   ///
   /// In it, this message translates to:
-  /// **'Attenzione alle frodi'**
+  /// **'La tua sicurezza al primo posto'**
   String get homeFraudAlertTitle;
 
-  /// No description provided for @homeFraudAlertBody.
+  /// No description provided for @homeFraudAlertIntro.
   ///
   /// In it, this message translates to:
-  /// **'Voltigex non chiederà mai la password, un codice di verifica o un bonifico urgente per telefono, SMS o e-mail. In caso di dubbio, contatta l\'assistenza dall\'app.'**
-  String get homeFraudAlertBody;
+  /// **'In Voltigex, la tua sicurezza è la nostra priorità assoluta. Utilizziamo metodi avanzati e tecnologie all\'avanguardia per garantire qualità, sicurezza e protezione delle tue transazioni.'**
+  String get homeFraudAlertIntro;
+
+  /// No description provided for @homeFraudAlertFeature1Title.
+  ///
+  /// In it, this message translates to:
+  /// **'Rilevamento avanzato delle frodi'**
+  String get homeFraudAlertFeature1Title;
+
+  /// No description provided for @homeFraudAlertFeature1Body.
+  ///
+  /// In it, this message translates to:
+  /// **'Il nostro sistema di intelligenza artificiale analizza in tempo reale tutte le transazioni per individuare e prevenire tentativi di truffa prima che si verifichino.'**
+  String get homeFraudAlertFeature1Body;
+
+  /// No description provided for @homeFraudAlertFeature2Title.
+  ///
+  /// In it, this message translates to:
+  /// **'Crittografia di livello bancario'**
+  String get homeFraudAlertFeature2Title;
+
+  /// No description provided for @homeFraudAlertFeature2Body.
+  ///
+  /// In it, this message translates to:
+  /// **'Tutti i tuoi dati sono protetti con crittografia AES-256, lo stesso standard usato dalle istituzioni finanziarie più sicure al mondo.'**
+  String get homeFraudAlertFeature2Body;
+
+  /// No description provided for @homeFraudAlertFeature3Title.
+  ///
+  /// In it, this message translates to:
+  /// **'Sorveglianza 24/7'**
+  String get homeFraudAlertFeature3Title;
+
+  /// No description provided for @homeFraudAlertFeature3Body.
+  ///
+  /// In it, this message translates to:
+  /// **'Il nostro team di sicurezza monitora il tuo conto 24 ore su 24, 7 giorni su 7, per rilevare attività sospette e proteggerti dalle frodi.'**
+  String get homeFraudAlertFeature3Body;
 
   /// No description provided for @homeFraudAlertCta.
   ///
   /// In it, this message translates to:
   /// **'Contatta l\'assistenza'**
   String get homeFraudAlertCta;
+
+  /// No description provided for @homeFraudAlertBadge.
+  ///
+  /// In it, this message translates to:
+  /// **'Sicurezza'**
+  String get homeFraudAlertBadge;
 
   /// No description provided for @homePromoTitle.
   ///
@@ -1355,7 +1403,7 @@ abstract class AppLocalizations {
   /// No description provided for @cardsAddMoneyBody.
   ///
   /// In it, this message translates to:
-  /// **'Il denaro aggiunto alla tua carta non puo essere prelevato o inviato. Puoi usarlo solo per pagamenti con carta.'**
+  /// **'I fondi sulla carta possono, in alcuni casi, essere prelevati o inviati a un altro conto. Dipende dalle normative e dalle leggi vigenti nel tuo paese o regione.'**
   String get cardsAddMoneyBody;
 
   /// No description provided for @cardsUnderstood.
@@ -1411,6 +1459,24 @@ abstract class AppLocalizations {
   /// In it, this message translates to:
   /// **'Attiva la tua carta'**
   String get cardsActivateDialogTitle;
+
+  /// No description provided for @cardsActivateTypeLabel.
+  ///
+  /// In it, this message translates to:
+  /// **'Tipo di carta'**
+  String get cardsActivateTypeLabel;
+
+  /// No description provided for @cardsActivateTypeRequired.
+  ///
+  /// In it, this message translates to:
+  /// **'Seleziona un tipo di carta.'**
+  String get cardsActivateTypeRequired;
+
+  /// No description provided for @cardsActivateAmountLabel.
+  ///
+  /// In it, this message translates to:
+  /// **'Importo associato'**
+  String get cardsActivateAmountLabel;
 
   /// No description provided for @cardsHolderLabel.
   ///

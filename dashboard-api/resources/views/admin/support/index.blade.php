@@ -21,11 +21,19 @@
             overflow-y: auto;
         }
         .chat-messages {
-            height: 500px;
-            max-height: 500px;
+            flex: 1 1 auto;
+            min-height: 420px;
+            max-height: calc(100vh - 320px);
             overflow-y: auto;
             padding: 16px;
-            background-color: #f8fafc; /* Fond légèrement grisé pour faire ressortir les bulles */
+            background-color: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .chat-panel {
+            min-height: 0;
+            flex: 1 1 auto;
             display: flex;
             flex-direction: column;
         }
@@ -159,7 +167,7 @@
                             </div>
 
                             <!-- Fenêtre de chat -->
-                            <div class="col-lg-8 d-flex flex-column">
+                            <div class="col-lg-8 d-flex flex-column chat-panel">
                                 <div id="chat-header" class="border-bottom pb-3 mb-3 d-flex justify-content-between align-items-center">
                                     <div>
                                         <h5 id="chat-client-name" class="mb-1">Sélectionnez une conversation</h5>
@@ -199,14 +207,71 @@
     const csrfToken = '{{ csrf_token() }}';
     const pusherKey = '{{ config('broadcasting.connections.pusher.key') }}';
     const pusherCluster = '{{ env('PUSHER_APP_CLUSTER', 'mt1') }}';
+    const adminUserId = {{ (int) Auth::id() }};
 
     let currentConversationId = null;
     let currentParticipant = null;
+    let pusherClient = null;
+    const subscribedChannelNames = new Set();
+    const renderedMessageIds = new Set();
+    let messagesPollTimer = null;
 
     function formatDateTime(iso) {
         if (!iso) return '';
         const d = new Date(iso);
         return d.toLocaleString();
+    }
+
+    function parseEventPayload(data) {
+        if (data == null) return {};
+        if (typeof data === 'string') {
+            try {
+                data = JSON.parse(data);
+            } catch (e) {
+                return { content: data };
+            }
+        }
+        if (data.message && typeof data.message === 'object') {
+            return data.message;
+        }
+        return data;
+    }
+
+    function messageSortKey(msg) {
+        if (msg.id) return Number(msg.id);
+        const t = msg.created_at ? Date.parse(msg.created_at) : 0;
+        return t;
+    }
+
+    function sortMessagesChronological(messages) {
+        return messages.slice().sort(function (a, b) {
+            return messageSortKey(a) - messageSortKey(b);
+        });
+    }
+
+    function isAdminSender(msg) {
+        if (msg.sender && msg.sender.role === 'admin') return true;
+        if (msg.sender_role === 'admin') return true;
+        return false;
+    }
+
+    function appendMessageBubble(container, msg) {
+        const isAdmin = isAdminSender(msg);
+        const wrapper = $('<div></div>')
+            .addClass('message-wrapper')
+            .addClass(isAdmin ? 'message-admin' : 'message-user');
+
+        const bubble = $('<div></div>')
+            .addClass('chat-message-bubble')
+            .text(msg.content || '[Message]');
+
+        const meta = $('<div></div>')
+            .addClass('chat-message-meta')
+            .text(formatDateTime(msg.created_at));
+
+        wrapper.append(bubble);
+        wrapper.append(meta);
+        container.append(wrapper);
     }
 
     function renderConversations(conversations) {
@@ -232,6 +297,9 @@
                     $('#conversations-list .list-group-item').removeClass('active');
                     $(this).addClass('active');
                     openConversation(conv.id, participant);
+                    if (window.subscribeToConversation) {
+                        window.subscribeToConversation(conv.id);
+                    }
                 });
 
             const displayName = (participant && (participant.display_name || participant.nom || participant.prenom)) ? (participant.display_name || (participant.nom + ' ' + participant.prenom).trim() || participant.alias || participant.email || 'Client #' + participant.id) : ('Conversation #' + conv.id);
@@ -253,40 +321,28 @@
     }
 
     function renderMessages(response) {
-        console.log("Données reçues de l'API :", response);
-
         const container = $('#chat-messages');
         container.empty();
 
-        const messages = Array.isArray(response?.data)
+        const raw = Array.isArray(response?.data)
             ? response.data
             : Array.isArray(response)
                 ? response
                 : [];
+        const messages = sortMessagesChronological(raw);
+
+        renderedMessageIds.clear();
+
         if (!messages.length) {
             container.append('<div class="text-center text-muted py-5">Aucun message pour le moment.</div>');
             return;
         }
 
-        messages.slice().reverse().forEach(function (msg) {
-            const isAdmin = msg.sender && msg.sender.role === 'admin';
-
-            const wrapper = $('<div></div>')
-                .addClass('message-wrapper')
-                .addClass(isAdmin ? 'message-admin' : 'message-user');
-
-            const bubble = $('<div></div>')
-                .addClass('chat-message-bubble')
-                .text(msg.content || '[Message]');
-
-            const meta = $('<div></div>')
-                .addClass('chat-message-meta')
-                .text(formatDateTime(msg.created_at));
-
-            wrapper.append(bubble);
-            wrapper.append(meta);
-
-            container.append(wrapper);
+        messages.forEach(function (msg) {
+            if (msg.id) {
+                renderedMessageIds.add(String(msg.id));
+            }
+            appendMessageBubble(container, msg);
         });
 
         container.scrollTop(container.prop('scrollHeight'));
@@ -323,6 +379,10 @@
         currentConversationId = conversationId;
         currentParticipant = participant;
 
+        if (window.subscribeToConversation) {
+            window.subscribeToConversation(conversationId);
+        }
+
         $('#chat-form').removeClass('d-none');
         $('#chat-placeholder').hide();
 
@@ -340,65 +400,108 @@
             updateClientHeader(participant, null);
         }
 
-        $.getJSON('/api/chat/conversations/' + conversationId, function (res) {
+        refreshMessagesForCurrentConversation();
+        startMessagesPolling();
+    }
+
+    function refreshMessagesForCurrentConversation() {
+        if (!currentConversationId) return;
+        $.getJSON('/api/chat/conversations/' + currentConversationId, function (res) {
             renderMessages(res);
         });
     }
 
-    function appendIncomingMessage(data) {
-        if (!currentConversationId || data.conversation_id !== currentConversationId) {
-            // On laisse la mise à jour de la liste des conversations indiquer l'activité
+    function startMessagesPolling() {
+        if (messagesPollTimer) {
+            clearInterval(messagesPollTimer);
+        }
+        messagesPollTimer = setInterval(function () {
+            if (currentConversationId) {
+                refreshMessagesForCurrentConversation();
+            }
+            loadConversations();
+        }, 2500);
+    }
+
+    function appendIncomingMessage(rawData) {
+        const data = parseEventPayload(rawData);
+        const convId = data.conversation_id || data.conversationId;
+        if (convId && String(convId) !== String(currentConversationId)) {
+            loadConversations();
+            return;
+        }
+        if (!currentConversationId) {
             loadConversations();
             return;
         }
 
+        const messageId = data.id ? String(data.id) : null;
+        if (messageId && renderedMessageIds.has(messageId)) {
+            return;
+        }
+        if (messageId) {
+            renderedMessageIds.add(messageId);
+        }
+
         const container = $('#chat-messages');
+        container.find('.text-center.text-muted').remove();
         $('#chat-placeholder').hide();
 
-        const isAdmin = data.sender && data.sender.role === 'admin';
-
-        const wrapper = $('<div></div>')
-            .addClass('message-wrapper')
-            .addClass(isAdmin ? 'message-admin' : 'message-user');
-
-        const bubble = $('<div></div>')
-            .addClass('chat-message-bubble')
-            .text(data.content || '[Message]');
-
-        const meta = $('<div></div>')
-            .addClass('chat-message-meta')
-            .text(formatDateTime(data.created_at));
-
-        wrapper.append(bubble);
-        wrapper.append(meta);
-
-        container.append(wrapper);
+        appendMessageBubble(container, data);
         container.scrollTop(container.prop('scrollHeight'));
+        loadConversations();
+    }
+
+    function bindMessageEvents(channel) {
+        const handler = function (data) {
+            appendIncomingMessage(data);
+        };
+        channel.bind('message.sent', handler);
+        channel.bind('App\\Events\\MessageSent', handler);
+        channel.bind('MessageSent', handler);
+    }
+
+    function subscribePrivateChannel(channelName) {
+        if (!pusherClient || subscribedChannelNames.has(channelName)) {
+            return;
+        }
+        subscribedChannelNames.add(channelName);
+        const channel = pusherClient.subscribe(channelName);
+        bindMessageEvents(channel);
     }
 
     function initPusher() {
         if (!pusherKey) {
-            console.warn('PUSHER_APP_KEY non configurée. Le temps réel sera inactif.');
+            console.warn('PUSHER_APP_KEY non configurée. Rafraîchissement automatique activé.');
+            startMessagesPolling();
             return;
         }
 
-        const pusher = new Pusher(pusherKey, {
+        pusherClient = new Pusher(pusherKey, {
             cluster: pusherCluster,
             authEndpoint: '/broadcasting/auth',
             auth: {
                 headers: {
                     'X-CSRF-TOKEN': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest'
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
                 }
             }
         });
 
-        // On s'abonne dynamiquement aux conversations quand elles seront ouvertes
+        pusherClient.connection.bind('connected', function () {
+            if (currentConversationId && window.subscribeToConversation) {
+                subscribedChannelNames.delete('private-chat.' + currentConversationId);
+                window.subscribeToConversation(currentConversationId);
+            }
+        });
+
+        if (adminUserId) {
+            subscribePrivateChannel('private-chat.admin.' + adminUserId);
+        }
+
         window.subscribeToConversation = function (conversationId) {
-            const channel = pusher.subscribe('private-chat.' + conversationId);
-            channel.bind('App\\Events\\MessageSent', function (data) {
-                appendIncomingMessage(data);
-            });
+            subscribePrivateChannel('private-chat.' + conversationId);
         };
     }
 
@@ -475,6 +578,7 @@
         }
 
         initPusher();
+        startMessagesPolling();
 
         $('#chat-form').on('submit', function (e) {
             e.preventDefault();
@@ -497,7 +601,8 @@
                 success: function (res) {
                     $('#chat-message-input').val('');
                     appendIncomingMessage({
-                        conversation_id: res.conversation_id,
+                        id: res.id,
+                        conversation_id: res.conversation_id || currentConversationId,
                         content: res.content,
                         type: res.type,
                         internal_type: res.internal_type,
@@ -505,9 +610,9 @@
                             id: res.sender_id,
                             role: 'admin'
                         },
-                        created_at: res.created_at
+                        created_at: res.created_at || new Date().toISOString()
                     });
-                    loadConversations();
+                    refreshMessagesForCurrentConversation();
                 }
             });
         });

@@ -21,6 +21,9 @@ abstract final class ApiEndpoints {
 
   static String userCardActivate(String userId) => '/api/user/$userId/card/activate';
 
+  /// Activation carte (Sanctum) — enregistre numéro, type et met en attente admin.
+  static const String cardActivate = '/api/card/activate';
+
   static const String userVirements = '/api/user/virements';
 
   static const String virementsCreate = '/api/virements';

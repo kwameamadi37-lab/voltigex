@@ -26,7 +26,9 @@ class GlobalController extends Controller
     }
 
     public function cartes(){
-        return view('cartes');
+        $cardCatalog = collect(\App\Support\CardCatalog::all())->keyBy('key');
+
+        return view('cartes', compact('cardCatalog'));
     }       
 
     public function contact(){

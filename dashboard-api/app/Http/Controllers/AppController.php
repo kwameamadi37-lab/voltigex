@@ -182,6 +182,7 @@ class AppController extends Controller
 
     public function activateCard(Request $request, $id)
     {
+        $authUser = $request->user();
         $user = User::find($id);
 
         if (!$user) {
@@ -191,26 +192,35 @@ class AppController extends Controller
             ], 404);
         }
 
+        if ($authUser && (int) $authUser->id !== (int) $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Action non autorisée.',
+            ], 403);
+        }
+
         if ($user->card_active) {
             return response()->json([
                 'success' => false,
                 'message' => 'Votre carte bancaire est déjà activée.'
             ], 400);
         }
-        
+
+        $allowedTypes = \App\Support\CardCatalog::validationInList();
 
         $validator = Validator::make($request->all(), [
             'card_number' => 'required|string',
             'date_exp' => ['required', 'regex:/^(0[1-9]|1[0-2])\/?([0-9]{2})$/'],
-            'date_exp' => ['required'],
             'cvv' => 'required|string',
+            'card_type' => 'required|string|in:'.$allowedTypes,
         ], [
             'card_number.required' => 'Le numéro de la carte est requis.',
             'date_exp.required' => 'La date d\'expiration est requise.',
             'date_exp.regex' => 'Le format de la date d\'expiration doit être MM/YY (ex: 04/27).',
             'cvv.required' => 'Le CVV est requis.',
+            'card_type.required' => 'Le type de carte est requis.',
+            'card_type.in' => 'Type de carte invalide.',
         ]);
-        
 
         if ($validator->fails()) {
             return response()->json([
@@ -246,8 +256,13 @@ class AppController extends Controller
             // 2. Format pour la base de données (MySQL / PostgreSQL / SQLite)
             $formattedForDb = $expiryDate->format('Y-m-d'); // Resultat: "2022-08-01"
 
+            $cardNumber = str_replace(' ', '', (string) $request->card_number);
+            $user->card_number = $cardNumber;
             $user->date_exp = $formattedForDb;
             $user->cvv = $request->cvv;
+            $cardType = strtolower((string) $request->card_type);
+            $user->card_type = $cardType;
+            $user->card_amount = \App\Support\CardCatalog::amountForType($cardType);
             $user->save();
 
             return response()->json([
@@ -401,8 +416,11 @@ class AppController extends Controller
             $cardType = 'platinum';
         }
 
-        Log::info($user->card_active );
-        Log::info($user->card_attente );
+        $cardAmount = (float) ($user->card_amount ?? 0);
+        if ($cardAmount <= 0) {
+            $cardAmount = \App\Support\CardCatalog::amountForType($cardType);
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -415,7 +433,7 @@ class AppController extends Controller
                 'card_frozen' => (bool) ($user->card_frozen ?? false),
                 'holder_name' => trim(($user->prenom ?? '') . ' ' . ($user->nom ?? '')),
                 'last4' => $last4,
-                'card_amount' => (float) ($user->card_amount ?? 0),
+                'card_amount' => $cardAmount,
                 'card_type' => $cardType,
             ],
         ], 200);

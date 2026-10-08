@@ -129,6 +129,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginRegisterPromptSubtitle => 'Tap here to create one.';
 
   @override
+  String get loginForgotPassword => 'Forgot password?';
+
+  @override
   String get registerHintUsername => 'Username';
 
   @override
@@ -269,14 +272,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeSuggestedForYou => 'Suggested for you';
 
   @override
-  String get homeFraudAlertTitle => 'Stay alert to fraud';
+  String get homeFraudAlertTitle => 'Your security comes first';
 
   @override
-  String get homeFraudAlertBody =>
-      'Voltigex will never ask for your password, a verification code, or an urgent transfer by phone, SMS, or email. If in doubt, contact support from the app.';
+  String get homeFraudAlertIntro =>
+      'At Voltigex, your security is our top priority. We use advanced methods and cutting-edge technology to ensure the quality, security, and protection of your transactions.';
+
+  @override
+  String get homeFraudAlertFeature1Title => 'Advanced fraud detection';
+
+  @override
+  String get homeFraudAlertFeature1Body =>
+      'Our AI system analyzes every transaction in real time to detect and prevent scam attempts before they happen.';
+
+  @override
+  String get homeFraudAlertFeature2Title => 'Bank-grade encryption';
+
+  @override
+  String get homeFraudAlertFeature2Body =>
+      'All your data is protected with AES-256 encryption, the same standard used by the world\'s most secure financial institutions.';
+
+  @override
+  String get homeFraudAlertFeature3Title => '24/7 monitoring';
+
+  @override
+  String get homeFraudAlertFeature3Body =>
+      'Our security team monitors your account around the clock to spot suspicious activity and protect you from fraud.';
 
   @override
   String get homeFraudAlertCta => 'Contact support';
+
+  @override
+  String get homeFraudAlertBadge => 'Security';
 
   @override
   String get homePromoTitle => 'Voltigex Days!';
@@ -662,7 +689,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cardsAddMoneyBody =>
-      'Money added to your card cannot be withdrawn or sent. You can only use it for card purchases.';
+      'Funds on your card may, in some cases, be withdrawn or sent to another account. This depends on the regulations and laws in force in your country or region.';
 
   @override
   String get cardsUnderstood => 'Got it';
@@ -690,6 +717,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cardsActivateDialogTitle => 'Activate your card';
+
+  @override
+  String get cardsActivateTypeLabel => 'Card type';
+
+  @override
+  String get cardsActivateTypeRequired => 'Please select a card type.';
+
+  @override
+  String get cardsActivateAmountLabel => 'Associated amount';
 
   @override
   String get cardsHolderLabel => 'Cardholder name';

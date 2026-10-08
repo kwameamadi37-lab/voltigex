@@ -16,9 +16,11 @@ abstract class DashboardRepository {
 
   /// Activation carte (vérif serveur).
   Future<List<CardEntity>> activateCardRemote({
+    required String cardHolder,
     required String cardNumber,
     required String dateExp,
     required String cvv,
+    required String cardType,
   });
 
   Future<List<CardEntity>> setCardFreezeRemote(bool freeze);

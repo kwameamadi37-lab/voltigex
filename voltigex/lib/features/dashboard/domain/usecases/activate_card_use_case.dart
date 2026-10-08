@@ -7,14 +7,18 @@ class ActivateCardUseCase {
   final DashboardRepository _repository;
 
   Future<List<CardEntity>> call({
+    required String cardHolder,
     required String cardNumber,
     required String dateExp,
     required String cvv,
+    required String cardType,
   }) {
     return _repository.activateCardRemote(
+      cardHolder: cardHolder,
       cardNumber: cardNumber,
       dateExp: dateExp,
       cvv: cvv,
+      cardType: cardType,
     );
   }
 }

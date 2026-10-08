@@ -22,14 +22,18 @@ class AddMoneyToCard extends CardsEvent {
 /// Données saisies / préremplies pour `POST .../card/activate`.
 class ActivateCard extends CardsEvent {
   ActivateCard({
+    required this.cardHolder,
     required this.cardNumber,
     required this.dateExp,
     required this.cvv,
+    required this.cardType,
   });
 
+  final String cardHolder;
   final String cardNumber;
   final String dateExp;
   final String cvv;
+  final String cardType;
 }
 
 class DeleteCard extends CardsEvent {}

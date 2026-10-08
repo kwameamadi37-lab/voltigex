@@ -52,18 +52,21 @@ class CardRemoteDataSource {
 
   /// Activation : vérifie numéro / expiration / CVV côté serveur.
   Future<CardModel> activateCard({
+    required String cardHolder,
     required String cardNumber,
     required String dateExp,
     required String cvv,
+    required String cardType,
   }) async {
-    
-    try{
+    try {
       final response = await _dio.post<Map<String, dynamic>>(
-        ApiEndpoints.userCardActivate(_userId),
+        ApiEndpoints.cardActivate,
         data: {
+          'card_holder': cardHolder.trim(),
           'card_number': cardNumber.replaceAll(RegExp(r'\s'), ''),
-          'date_exp': dateExp,
+          'expiry_date': dateExp,
           'cvv': cvv,
+          'card_type': cardType.toLowerCase().trim(),
         },
         options: Options(headers: {'Accept': 'application/json'}),
       );

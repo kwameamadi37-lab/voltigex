@@ -622,91 +622,158 @@ Widget _homeRecentActivitiesSection(
   );
 }
 
+Widget _homeFraudFeatureTile({
+  required IconData icon,
+  required Color iconColor,
+  required Color iconBackground,
+  required String title,
+  required String body,
+}) {
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: iconBackground,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Icon(icon, color: iconColor, size: 22),
+      ),
+      const SizedBox(width: 14),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: GoogleFonts.inter(
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: Color(0xFF111827),
+                  height: 1.25,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              body,
+              style: GoogleFonts.inter(
+                textStyle: TextStyle(
+                  fontWeight: FontWeight.w400,
+                  fontSize: 12.5,
+                  height: 1.45,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
 Widget _homeFraudAlertSection(BuildContext context) {
   final l10n = AppLocalizations.of(context)!;
+  const radius = 24.0;
+
   return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 22),
-    child: Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => openSupportChatInMainTab(context),
-        borderRadius: BorderRadius.circular(14),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFF7ED),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFFDBA74).withValues(alpha: 0.55)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.homeFraudAlertIntro,
+                style: GoogleFonts.inter(
+                  textStyle: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13.5,
+                    height: 1.5,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
               ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 14, 16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEA580C).withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
+              const SizedBox(height: 20),
+              _homeFraudFeatureTile(
+                    icon: Icons.auto_awesome_rounded,
+                    iconColor: const Color(0xFF7C3AED),
+                    iconBackground: const Color(0xFFEDE9FE),
+                    title: l10n.homeFraudAlertFeature1Title,
+                    body: l10n.homeFraudAlertFeature1Body,
                   ),
-                  child: const Icon(
-                    Icons.shield_outlined,
-                    color: Color(0xFFEA580C),
-                    size: 24,
+                  const SizedBox(height: 16),
+                  Divider(height: 1, color: Colors.grey.shade200),
+                  const SizedBox(height: 16),
+                  _homeFraudFeatureTile(
+                    icon: Icons.lock_rounded,
+                    iconColor: const Color(0xFF0369A1),
+                    iconBackground: const Color(0xFFE0F2FE),
+                    title: l10n.homeFraudAlertFeature2Title,
+                    body: l10n.homeFraudAlertFeature2Body,
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.homeFraudAlertTitle,
-                        style: GoogleFonts.inter(
-                          textStyle: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15.5,
-                            color: Color(0xFF9A3412),
-                          ),
+                  const SizedBox(height: 16),
+                  Divider(height: 1, color: Colors.grey.shade200),
+                  const SizedBox(height: 16),
+                  _homeFraudFeatureTile(
+                    icon: Icons.radar_rounded,
+                    iconColor: const Color(0xFF047857),
+                    iconBackground: const Color(0xFFD1FAE5),
+                    title: l10n.homeFraudAlertFeature3Title,
+                    body: l10n.homeFraudAlertFeature3Body,
+                  ),
+                  const SizedBox(height: 22),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => openSupportChatInMainTab(context),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: DefaultColors.blueBackground,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        l10n.homeFraudAlertBody,
-                        style: GoogleFonts.inter(
-                          textStyle: TextStyle(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 13,
-                            height: 1.45,
-                            color: Colors.grey.shade800,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            l10n.homeFraudAlertCta,
+                            style: GoogleFonts.inter(
+                              textStyle: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14.5,
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.arrow_forward_rounded, size: 18),
+                        ],
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        l10n.homeFraudAlertCta,
-                        style: GoogleFonts.inter(
-                          textStyle: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                            color: DefaultColors.blueBackground,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-                Icon(Icons.chevron_right_rounded, color: Colors.grey.shade500),
-              ],
-            ),
-          ),
+                ],
+              ),
         ),
       ),
     ),

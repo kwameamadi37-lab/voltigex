@@ -11,7 +11,6 @@ import 'package:voltigex/l10n/app_localizations.dart';
 import 'package:voltigex/features/dashboard/profile/presentation/bloc/profile_bloc.dart';
 import 'package:voltigex/features/dashboard/profile/presentation/bloc/profile_event.dart';
 import 'package:voltigex/features/dashboard/profile/presentation/bloc/profile_state.dart';
-import 'package:voltigex/features/dashboard/profile/presentation/pages/address_verification_page.dart';
 import 'package:voltigex/features/dashboard/profile/presentation/pages/cards_history_page.dart';
 import 'package:voltigex/features/dashboard/profile/presentation/pages/legal_documentation_page.dart';
 import 'package:voltigex/features/dashboard/profile/presentation/pages/personal_data_page.dart';
@@ -117,28 +116,6 @@ class SettingsPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 48),
-                  _SectionTitle(label: l10n.settingsDocumentsSection),
-                  _WhiteCard(
-                    children: [
-                      _ProfileMenuRow(
-                        title: l10n.settingsMenuDocuments,
-                        icon: Icons.description_outlined,
-                        iconColor: DefaultColors.blueBackground,
-                        circleColor: _mintCircle(context),
-                        onTap: () {
-                          Navigator.of(context, rootNavigator: false).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => BlocProvider.value(
-                                value: context.read<ProfileBloc>(),
-                                child: const AddressVerificationPage(),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 22),
                   _SectionTitle(label: l10n.settingsGeneralSection),
                   _WhiteCard(
                     children: [

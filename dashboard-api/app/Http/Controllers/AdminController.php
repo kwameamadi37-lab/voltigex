@@ -155,6 +155,9 @@ class AdminController extends Controller
         if ($user) {
             $user->card_active = true;
             $user->card_attente = false;
+            if ((float) ($user->card_amount ?? 0) <= 0) {
+                $user->card_amount = \App\Support\CardCatalog::amountForType((string) ($user->card_type ?? 'platinum'));
+            }
             $user->save();
 
             DB::table('notifications')->insert([

@@ -188,9 +188,11 @@ class CardsBloc extends Bloc<CardsEvent, CardsState> {
     try {
       final exp = _normalizeExpiryForApi(event.dateExp);
       final cards = await _activateCardUseCase(
+        cardHolder: event.cardHolder.trim(),
         cardNumber: event.cardNumber.replaceAll(RegExp(r'\s'), ''),
         dateExp: exp,
         cvv: event.cvv.trim(),
+        cardType: event.cardType.trim(),
       );
       _markRemoteSuccess();
 

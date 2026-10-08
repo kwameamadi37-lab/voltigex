@@ -105,6 +105,8 @@ Route::get('/sign-up', function () {
     return view('auth.sign-up');
 })->name('sign-up');
 
+Route::redirect('/register', '/sign-up');
+
 // Routes mot de passe oublié
 Route::get('/password/reset', [App\Http\Controllers\Auth\ForgotPasswordController::class, 'showLinkRequestForm'])->name('password.request');
 Route::post('/password/email', [App\Http\Controllers\Auth\ForgotPasswordController::class, 'sendResetLinkEmail'])->name('password.email');

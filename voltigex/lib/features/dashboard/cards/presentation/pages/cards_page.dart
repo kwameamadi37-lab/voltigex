@@ -13,6 +13,8 @@ import 'package:voltigex/features/dashboard/domain/entities/card_entity.dart';
 import 'package:voltigex/features/dashboard/cards/presentation/bloc/cards_bloc.dart';
 import 'package:voltigex/features/dashboard/cards/presentation/bloc/cards_event.dart';
 import 'package:voltigex/features/dashboard/cards/presentation/bloc/cards_state.dart';
+import 'package:voltigex/core/config/app_remote_config.dart';
+import 'package:voltigex/core/config/card_catalog_entry.dart';
 import 'package:voltigex/l10n/app_localizations.dart';
 
 /// Fond page cartes (Scaffold) — clair uniquement, jamais de filtre gris au-dessus.
@@ -65,6 +67,8 @@ abstract final class _CardTypeAssets {
       imagePathByTier[safeTier] ?? imagePathByTier['platinum']!;
 }
 
+const String _kMaskedCardNumber = '**** **** **** ****';
+
 String _normalizeCardTier(String cardType) {
   final tier = cardType.toLowerCase().trim();
   if (tier.contains('gold')) return 'gold';
@@ -72,7 +76,23 @@ String _normalizeCardTier(String cardType) {
   return 'platinum';
 }
 
-String _cardTierLabel(BuildContext context, String tier) {
+Color _tierHeaderBadgeColor(String tier) {
+  switch (_normalizeCardTier(tier)) {
+    case 'gold':
+      return const Color(0xFFB45309);
+    case 'diamond':
+      return const Color(0xFF4F46E5);
+    default:
+      return const Color(0xFF475569);
+  }
+}
+
+String _cardTierLabel(BuildContext context, String tier, {AppRemoteConfig? remoteConfig}) {
+  final lang = Localizations.localeOf(context).languageCode;
+  final fromApi = remoteConfig?.labelForCardTier(tier, lang);
+  if (fromApi != null && fromApi.isNotEmpty) {
+    return fromApi;
+  }
   final l10n = AppLocalizations.of(context)!;
   switch (_normalizeCardTier(tier)) {
     case 'gold':
@@ -181,6 +201,83 @@ class _CardsPageState extends State<CardsPage> {
   /// Transactions spécifiques à la carte (mock vide → état illustré « globe »).
   static const List<void> _cardTransactions = [];
   bool _didPrecacheCardBackgrounds = false;
+  AppRemoteConfig? _remoteConfig;
+
+  /// Type choisi avant activation (modale ou badge) — conservé après fermeture de la modale.
+  String? _preferredCardType;
+
+  @override
+  void initState() {
+    super.initState();
+    AppRemoteConfig.load().then((config) {
+      if (mounted) {
+        setState(() => _remoteConfig = config);
+      }
+    });
+  }
+
+  List<CardCatalogEntry> get _activationCatalog =>
+      _remoteConfig?.enabledCardCatalog ?? AppRemoteConfig.fallback.enabledCardCatalog;
+
+  double _catalogAmountFor(String tierKey) {
+    for (final entry in _activationCatalog) {
+      if (entry.key == tierKey) return entry.amount;
+    }
+    return _remoteConfig?.amountForCardTier(tierKey) ?? 0;
+  }
+
+  String _cardTypeOptionLabel(
+    BuildContext context,
+    CardCatalogEntry entry,
+    String languageCode,
+  ) {
+    final name = entry.labelForLocale(languageCode);
+    if (entry.amount <= 0) return name;
+    return '$name · ${_cardsMoneyFormat(context).format(entry.amount)}';
+  }
+
+  double _displayBalanceForCard(CardEntity card) {
+    if (card.isActive && card.balance > 0) {
+      return card.balance;
+    }
+    final fromCatalog = _catalogAmountFor(card.cardType);
+    if (fromCatalog > 0) return fromCatalog;
+    return card.balance;
+  }
+
+  String _effectiveDisplayCardType(CardEntity card) {
+    if (card.isActive || card.isPending) {
+      return _normalizeCardTier(card.cardType);
+    }
+    return _preferredCardType ?? _normalizeCardTier(card.cardType);
+  }
+
+  bool _canEditCardTypeBeforeActivation(CardEntity card) {
+    return !card.isActive && !card.isPending;
+  }
+
+  Widget _tierBackgroundImage(String safeTier) {
+    final url = _remoteConfig?.imageUrlForCardTier(safeTier);
+    final assetPath = _CardTypeAssets.pathForTier(safeTier);
+    if (url != null && url.isNotEmpty) {
+      return Image.network(
+        url,
+        fit: BoxFit.cover,
+        filterQuality: FilterQuality.high,
+        errorBuilder: (_, __, ___) => Image.asset(
+          assetPath,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.high,
+        ),
+      );
+    }
+    return Image.asset(
+      assetPath,
+      fit: BoxFit.cover,
+      filterQuality: FilterQuality.high,
+      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+    );
+  }
 
   @override
   void didChangeDependencies() {
@@ -620,20 +717,105 @@ class _CardsPageState extends State<CardsPage> {
     );
   }
 
+  void _showCardTypePicker(CardEntity card) {
+    if (!_canEditCardTypeBeforeActivation(card)) return;
+    final catalog = _activationCatalog;
+    if (catalog.isEmpty) return;
+
+    final l10n = AppLocalizations.of(context)!;
+    final lang = Localizations.localeOf(context).languageCode;
+    var current = _effectiveDisplayCardType(card);
+    if (catalog.every((e) => e.key != current)) {
+      current = catalog.first.key;
+    }
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.cardsActivateTypeLabel,
+                        style: GoogleFonts.inter(
+                          textStyle: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: _kTextPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              for (final entry in catalog)
+                ListTile(
+                  title: Text(
+                    _cardTypeOptionLabel(sheetContext, entry, lang),
+                    style: GoogleFonts.inter(
+                      textStyle: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: _kTextPrimary,
+                      ),
+                    ),
+                  ),
+                  trailing: current == entry.key
+                      ? Icon(Icons.check_circle, color: DefaultColors.blueBackground)
+                      : null,
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    if (!mounted) return;
+                    setState(() => _preferredCardType = entry.key);
+                  },
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showActivateDialog(CardEntity card) {
     _cardHolderController.text = card.holderName;
-    _cardNumberController.text = card.numberDisplay;
+    _cardNumberController.text = '';
     final exp = card.expiryDisplay;
     _cardExpDateController.text = exp.length >= 4
         ? '${exp.substring(0, 2)}/${exp.substring(exp.length - 2)}'
         : exp;
     _cardCvvController.text = card.cvc;
 
+    final catalog = _activationCatalog;
+    var selectedType = _effectiveDisplayCardType(card);
+    if (catalog.every((e) => e.key != selectedType)) {
+      selectedType = catalog.isNotEmpty ? catalog.first.key : 'platinum';
+    }
+
+    setState(() => _preferredCardType = selectedType);
+
     showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (BuildContext dialogContext) {
         final l10n = AppLocalizations.of(dialogContext)!;
+        final lang = Localizations.localeOf(dialogContext).languageCode;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
         return Dialog(
           backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(
@@ -669,6 +851,152 @@ class _CardsPageState extends State<CardsPage> {
                     key: _formKey,
                     child: Column(
                       children: [
+                        const SizedBox(height: 15),
+                        DropdownButtonFormField<String>(
+                          value: selectedType,
+                          isExpanded: true,
+                          dropdownColor: Colors.white,
+                          icon: Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: Colors.grey.shade700,
+                          ),
+                          style: GoogleFonts.inter(
+                            textStyle: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: _kTextPrimary,
+                            ),
+                          ),
+                          decoration: InputDecoration(
+                            labelText: l10n.cardsActivateTypeLabel,
+                            labelStyle: GoogleFonts.inter(
+                              textStyle: TextStyle(
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: const Color(0xFFF9FAFB),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                color: DefaultColors.blueBackground,
+                                width: 1.5,
+                              ),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                          ),
+                          items: [
+                            for (final entry in catalog)
+                              DropdownMenuItem<String>(
+                                value: entry.key,
+                                child: Text(
+                                  _cardTypeOptionLabel(
+                                    dialogContext,
+                                    entry,
+                                    lang,
+                                  ),
+                                  style: GoogleFonts.inter(
+                                    textStyle: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: _kTextPrimary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                          selectedItemBuilder: (context) {
+                            return [
+                              for (final entry in catalog)
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    _cardTypeOptionLabel(
+                                      dialogContext,
+                                      entry,
+                                      lang,
+                                    ),
+                                    style: GoogleFonts.inter(
+                                      textStyle: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: _kTextPrimary,
+                                      ),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                            ];
+                          },
+                          onChanged: (value) {
+                            if (value == null) return;
+                            setDialogState(() => selectedType = value);
+                            if (mounted) {
+                              setState(() => _preferredCardType = value);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: DefaultColors.blueBackground.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: DefaultColors.blueBackground.withValues(alpha: 0.15),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.payments_outlined,
+                                size: 22,
+                                color: DefaultColors.blueBackground.withValues(alpha: 0.9),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  l10n.cardsActivateAmountLabel,
+                                  style: GoogleFonts.inter(
+                                    textStyle: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                _cardsMoneyFormat(dialogContext).format(
+                                  _catalogAmountFor(selectedType),
+                                ),
+                                style: GoogleFonts.inter(
+                                  textStyle: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: DefaultColors.blueBackground,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: 15),
                         BuildLabeledTextField(
                           label: l10n.cardsHolderLabel,
@@ -725,13 +1053,23 @@ class _CardsPageState extends State<CardsPage> {
                           text: l10n.cardsActivateButton,
                           onPressed: () {
                             WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (selectedType.isEmpty) {
+                                TopSnackBar.show(
+                                  dialogContext,
+                                  l10n.cardsActivateTypeRequired,
+                                  type: TopSnackBarType.error,
+                                );
+                                return;
+                              }
                               if (_formKey.currentState!.validate()) {
                                 Navigator.pop(dialogContext);
                                 context.read<CardsBloc>().add(
                                       ActivateCard(
+                                        cardHolder: _cardHolderController.text,
                                         cardNumber: _cardNumberController.text,
                                         dateExp: _cardExpDateController.text,
                                         cvv: _cardCvvController.text,
+                                        cardType: selectedType,
                                       ),
                                     );
                               }
@@ -746,6 +1084,8 @@ class _CardsPageState extends State<CardsPage> {
               ),
             ),
           ),
+        );
+          },
         );
       },
     );
@@ -839,6 +1179,7 @@ class _CardsPageState extends State<CardsPage> {
       listener: (context, state) {
         if (state is CardsLoaded) {
           if (state.cardsActivationDemandSucess == true) {
+            setState(() => _preferredCardType = null);
             TopSnackBar.show(
               context,
               l10n.cardsActivationDemandSuccessMessage,
@@ -922,6 +1263,18 @@ class _CardsPageState extends State<CardsPage> {
     final cardW = (w - 48).clamp(280.0, 360.0);
     final cardH = cardW * 0.63;
 
+    final canEditType = _canEditCardTypeBeforeActivation(card);
+    final displayCardType = _effectiveDisplayCardType(card);
+    final displayBalance = canEditType && _preferredCardType != null
+        ? _catalogAmountFor(displayCardType)
+        : _displayBalanceForCard(card.copyWith(cardType: displayCardType));
+    final tierLabel = _cardTierLabel(
+      context,
+      displayCardType,
+      remoteConfig: _remoteConfig,
+    );
+    final balanceFormatted = _cardsMoneyFormat(context).format(displayBalance);
+
     return Scaffold(
       backgroundColor: _kCardsBg,
       body: RefreshIndicator(
@@ -940,41 +1293,58 @@ class _CardsPageState extends State<CardsPage> {
                   const SizedBox(width: 44),
                   Expanded(
                     child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: canEditType
+                              ? () => _showCardTypePicker(card)
+                              : null,
                           borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 7,
                             ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              '🇫🇷',
-                              style: TextStyle(fontSize: 18),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              l10n.cardsBalanceLabel,
-                              style: GoogleFonts.inter(
-                                textStyle: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: _kTextPrimary,
+                            decoration: BoxDecoration(
+                              color: _tierHeaderBadgeColor(displayCardType),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _tierHeaderBadgeColor(displayCardType)
+                                      .withValues(alpha: 0.35),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
                                 ),
-                              ),
+                              ],
                             ),
-                          ],
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    '${tierLabel.toUpperCase()} · $balanceFormatted',
+                                    style: GoogleFonts.inter(
+                                      textStyle: const TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.6,
+                                        color: _kOnCardForegroundWhite,
+                                      ),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (canEditType) ...[
+                                  const SizedBox(width: 4),
+                                  const Icon(
+                                    Icons.expand_more_rounded,
+                                    size: 18,
+                                    color: _kOnCardForegroundWhite,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -982,9 +1352,9 @@ class _CardsPageState extends State<CardsPage> {
                   IconButton(
                     onPressed: _showBeforeYouAddMoneySheet,
                     icon: Icon(
-                      Icons.info_outline_rounded,
-                      color: _kTextPrimary,
-                      size: 26,
+                      Icons.warning_amber_rounded,
+                      color: Colors.amber.shade800,
+                      size: 28,
                     ),
                     tooltip: l10n.cardsInfoTooltip,
                   ),
@@ -1000,17 +1370,17 @@ class _CardsPageState extends State<CardsPage> {
                     _buildVoltigexCardVisual(
                       cardW,
                       cardH,
-                      cardType: card.cardType,
+                      cardType: displayCardType,
                       showTierBadge: card.isActive && !card.isFrozen,
-                      tierBadgeLabel: _cardTierLabel(context, card.cardType),
+                      tierBadgeLabel: tierLabel,
                       dimmed: !card.isActive || card.isFrozen,
                       brandLabel: l10n.cardsBrandVoltigex,
                       holderLabel: l10n.cardsHolderLabel,
                       expiryLabel: l10n.cardsExpiryLabel,
                       holderName: card.holderName,
-                      cardNumber: '**** **** **** ${card.last4}',
+                      cardNumber: _kMaskedCardNumber,
                       expiry: card.expiryDisplay,
-                      balanceText: _cardsMoneyFormat(context).format(card.balance),
+                      balanceText: balanceFormatted,
                       onDetailsTap: (!card.isActive || loaded.cardActionLoading)
                           ? null
                           : () {
@@ -1167,7 +1537,6 @@ class _CardsPageState extends State<CardsPage> {
     const radius = 16.0;
     final br = BorderRadius.circular(radius);
     final safeTier = _normalizeCardTier(cardType);
-    final assetPath = _CardTypeAssets.pathForTier(safeTier);
     final fallbackColor = _CardTierStyle.fallbackBackground(safeTier);
 
     Widget buildTierFace() {
@@ -1190,12 +1559,7 @@ class _CardsPageState extends State<CardsPage> {
                 ),
               ),
               Positioned.fill(
-                child: Image.asset(
-                  assetPath,
-                  fit: BoxFit.cover,
-                  filterQuality: FilterQuality.high,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                ),
+                child: _tierBackgroundImage(safeTier),
               ),
               Positioned(
                 left: 16,

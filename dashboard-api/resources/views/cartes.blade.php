@@ -97,7 +97,7 @@
                         <div class="border-t border-gray-200 pt-6 mb-6">
                             <div class="flex items-baseline justify-between mb-2">
                                 <span class="text-gray-600">Frais annuels</span>
-                                <span class="text-2xl font-bold text-gray-900">650€</span>
+                                <span class="text-2xl font-bold text-gray-900">{{ number_format((float) data_get($cardCatalog->get('gold'), 'amount', 650), 0, ',', ' ') }}€</span>
                             </div>
                             <p class="text-sm text-gray-500">Première année offerte</p>
                         </div>
@@ -170,7 +170,7 @@
                         <div class="border-t border-gray-200 pt-6 mb-6">
                             <div class="flex items-baseline justify-between mb-2">
                                 <span class="text-gray-600">Frais annuels</span>
-                                <span class="text-2xl font-bold text-gray-900">1500€</span>
+                                <span class="text-2xl font-bold text-gray-900">{{ number_format((float) data_get($cardCatalog->get('diamond'), 'amount', 1500), 0, ',', ' ') }}€</span>
                             </div>
                             <p class="text-sm text-gray-500">Première année offerte</p>
                         </div>
@@ -234,7 +234,7 @@
                         <div class="border-t border-gray-200 pt-6 mb-6">
                             <div class="flex items-baseline justify-between mb-2">
                                 <span class="text-gray-600">Frais annuels</span>
-                                <span class="text-2xl font-bold text-gray-900">3500€</span>
+                                <span class="text-2xl font-bold text-gray-900">{{ number_format((float) data_get($cardCatalog->get('platinum'), 'amount', 3500), 0, ',', ' ') }}€</span>
                             </div>
                             <p class="text-sm text-gray-500">Première année offerte</p>
                         </div>

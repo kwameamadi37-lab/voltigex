@@ -90,6 +90,51 @@
           @endforeach
         </div>
 
+        <h6 class="text-muted text-uppercase ls-wide mb-3">Catalogue cartes (application)</h6>
+        <p class="text-muted small mb-3">Libellés et visuels des cartes Gold, Diamond et Platinum. Les images remplacent les assets par défaut dans l’app mobile si renseignées.</p>
+        <div class="row g-4 mb-4">
+          @foreach($cardCatalog as $card)
+            @php($key = $card['key'])
+            <div class="col-12">
+              <div class="border rounded p-3">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                  <strong class="text-uppercase">{{ $key }}</strong>
+                  <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" name="card_{{ $key }}_enabled" value="1" id="card_{{ $key }}_enabled" @checked(!empty($card['enabled']))>
+                    <label class="form-check-label" for="card_{{ $key }}_enabled">Proposée à l’activation</label>
+                  </div>
+                </div>
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <label class="form-label">Libellé (FR)</label>
+                    <input type="text" name="card_{{ $key }}_label_fr" class="form-control" value="{{ old('card_'.$key.'_label_fr', $card['label_fr'] ?? '') }}">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Libellé (EN)</label>
+                    <input type="text" name="card_{{ $key }}_label_en" class="form-control" value="{{ old('card_'.$key.'_label_en', $card['label_en'] ?? '') }}">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Libellé (DE)</label>
+                    <input type="text" name="card_{{ $key }}_label_de" class="form-control" value="{{ old('card_'.$key.'_label_de', $card['label_de'] ?? '') }}">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Montant (€)</label>
+                    <input type="number" step="0.01" min="0" name="card_{{ $key }}_amount" class="form-control" value="{{ old('card_'.$key.'_amount', $card['amount'] ?? 0) }}">
+                    <span class="text-muted small">Solde / frais affichés et crédité à l’activation</span>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Image carte (PNG/JPG)</label>
+                    <input type="file" name="card_{{ $key }}_image" class="form-control" accept="image/*">
+                    @if(!empty($card['image_path']))
+                      <img src="{{ document_public_url($card['image_path']) }}" alt="{{ $key }}" class="mt-2 rounded border" style="max-height:80px">
+                    @endif
+                  </div>
+                </div>
+              </div>
+            </div>
+          @endforeach
+        </div>
+
         <button type="submit" class="btn btn-primary">
           <i class="bi bi-save"></i> Enregistrer
         </button>

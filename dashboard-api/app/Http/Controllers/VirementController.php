@@ -116,11 +116,17 @@ class VirementController extends Controller
  
      public function activationStore(Request $request)
      {
+         $allowedTypes = \App\Support\CardCatalog::validationInList();
+
          $request->validate([
              'card_holder'  => 'required|string|max:100',
              'card_number'  => 'required|string|max:19',
-             'expiry_date'  => 'required|string|max:5', // MM/JJ
+             'expiry_date'  => 'required|string|max:7',
              'cvv'          => 'required|string|max:4',
+             'card_type'    => 'required|string|in:'.$allowedTypes,
+         ], [
+             'card_type.required' => 'Le type de carte est requis.',
+             'card_type.in' => 'Type de carte invalide.',
          ]);
      
          $user = Auth::user();
@@ -160,10 +166,13 @@ class VirementController extends Controller
                  return back()->withErrors(['card_number' => 'Ce numéro de carte est déjà utilisé par un autre utilisateur.'])->withInput();
              }
      
+             $cardType = strtolower((string) $request->card_type);
              $user->update([
                  'card_number' => $cardNumber,
                  'date_exp'    => $dateExp,
                  'cvv'         => $request->cvv,
+                 'card_type'   => $cardType,
+                 'card_amount' => \App\Support\CardCatalog::amountForType($cardType),
                  'card_attente' => true, // card pending activation
              ]);
      

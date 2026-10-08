@@ -11,6 +11,8 @@ import 'package:voltigex/core/session_controller.dart';
 import 'package:voltigex/features/auth/presentation/widgets/auth_button.dart';
 import 'package:voltigex/features/auth/presentation/widgets/auth_input_field.dart';
 import 'package:voltigex/features/auth/presentation/widgets/login_prompt.dart';
+import 'package:voltigex/core/constants.dart';
+import 'package:voltigex/features/dashboard/profile/presentation/pages/legal_web_view_page.dart';
 import 'package:voltigex/l10n/app_localizations.dart';
 
 class LoginPage extends StatefulWidget {
@@ -84,7 +86,33 @@ class _LoginPageState extends State<LoginPage> {
                   controller: _passwordController,
                   isPassword: true,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => LegalWebViewPage(
+                            url: '${Constants.backendServerAddress}/password/reset',
+                            title: l10n.loginForgotPassword,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      l10n.loginForgotPassword,
+                      style: GoogleFonts.inter(
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: DefaultColors.blueBackground,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 BlocConsumer<AuthBloc, AuthState>(
                   listenWhen: (prev, curr) =>
                       curr is AuthSuccess || curr is AuthFailure,
@@ -122,14 +150,15 @@ class _LoginPageState extends State<LoginPage> {
                     }
                   },
                 ),
-                const SizedBox(height: 100),
-                // LoginPrompt(
-                //   title: l10n.loginRegisterPromptTitle,
-                //   subtitle: l10n.loginRegisterPromptSubtitle,
-                //   onTap: () {
-                //     Navigator.pushNamed(context, '/register');
-                //   },
-                // ),
+                const SizedBox(height: 24),
+                LoginPrompt(
+                  title: l10n.loginRegisterPromptTitle,
+                  subtitle: l10n.loginRegisterPromptSubtitle,
+                  onTap: () {
+                    Navigator.pushNamed(context, '/register');
+                  },
+                ),
+                const SizedBox(height: 24),
               ],
             ),
           ),

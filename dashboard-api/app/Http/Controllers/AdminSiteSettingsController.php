@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\SiteSetting;
+use App\Support\CardCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -11,8 +12,9 @@ class AdminSiteSettingsController extends Controller
     public function edit()
     {
         $settings = SiteSetting::allCached();
+        $cardCatalog = CardCatalog::all();
 
-        return view('admin.settings', compact('settings'));
+        return view('admin.settings', compact('settings', 'cardCatalog'));
     }
 
     public function update(Request $request)
@@ -34,6 +36,21 @@ class AdminSiteSettingsController extends Controller
             'legal_privacy_pdf' => 'nullable|file|mimes:pdf|max:10240',
             'legal_terms_pdf' => 'nullable|file|mimes:pdf|max:10240',
             'legal_security_pdf' => 'nullable|file|mimes:pdf|max:10240',
+            'card_gold_label_fr' => 'nullable|string|max:100',
+            'card_gold_label_en' => 'nullable|string|max:100',
+            'card_gold_label_de' => 'nullable|string|max:100',
+            'card_diamond_label_fr' => 'nullable|string|max:100',
+            'card_diamond_label_en' => 'nullable|string|max:100',
+            'card_diamond_label_de' => 'nullable|string|max:100',
+            'card_platinum_label_fr' => 'nullable|string|max:100',
+            'card_platinum_label_en' => 'nullable|string|max:100',
+            'card_platinum_label_de' => 'nullable|string|max:100',
+            'card_gold_amount' => 'nullable|numeric|min:0',
+            'card_diamond_amount' => 'nullable|numeric|min:0',
+            'card_platinum_amount' => 'nullable|numeric|min:0',
+            'card_gold_image' => 'nullable|image|max:4096',
+            'card_diamond_image' => 'nullable|image|max:4096',
+            'card_platinum_image' => 'nullable|image|max:4096',
         ]);
 
         foreach ([
@@ -53,6 +70,16 @@ class AdminSiteSettingsController extends Controller
             if ($request->hasFile($fileKey)) {
                 $path = $request->file($fileKey)->store('legal', 'public');
                 SiteSetting::set($fileKey, $path);
+            }
+        }
+
+        CardCatalog::persistFromAdminInput($request->all());
+
+        foreach (['gold', 'diamond', 'platinum'] as $tierKey) {
+            $fileKey = 'card_'.$tierKey.'_image';
+            if ($request->hasFile($fileKey)) {
+                $path = $request->file($fileKey)->store('cards', 'public');
+                CardCatalog::updateImagePath($tierKey, $path);
             }
         }
 

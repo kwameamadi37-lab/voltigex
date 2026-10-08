@@ -55,14 +55,18 @@ class DashboardRepositoryImpl implements DashboardRepository {
 
   @override
   Future<List<CardEntity>> activateCardRemote({
+    required String cardHolder,
     required String cardNumber,
     required String dateExp,
     required String cvv,
+    required String cardType,
   }) async {
     final m = await _cardRemote.activateCard(
+      cardHolder: cardHolder,
       cardNumber: cardNumber,
       dateExp: dateExp,
       cvv: cvv,
+      cardType: cardType,
     );
     await _cardLocal.write(m);
     return [_entity(m)];

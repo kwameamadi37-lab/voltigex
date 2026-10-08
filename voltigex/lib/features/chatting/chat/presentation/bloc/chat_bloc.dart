@@ -1248,7 +1248,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   
   // Normalisation du nom de l'événement socket
   final socketNorm = (data['_socket_event_normalized']?.toString() ?? '')
-      .replaceAll(RegExp(r'[^a-zA-Z0-0]'), '')
+      .replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')
       .toLowerCase();
 
   final dataSansMeta = Map<String, dynamic>.from(data)
@@ -1293,9 +1293,12 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   }
 
   // 3. Identification explicite d'un Message Sent (Afin d'éviter qu'un Read Receipt le court-circuite)
+  final socketRaw = (data['_socket_event']?.toString() ?? '').toLowerCase();
   final isMessageSentEvent = eventType.contains('messagesent') ||
       eventName.contains('messagesent') ||
-      socketNorm.contains('messagesent');
+      socketNorm.contains('messagesent') ||
+      socketRaw.contains('message.sent') ||
+      socketRaw.contains('messagesent');
 
   // 4. Gestion des accusés de lecture (Read Receipts)
   // On ne le traite comme ReadReceipt QUE SI ce n'est PAS un événement MessageSent

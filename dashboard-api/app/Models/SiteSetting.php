@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\CardCatalog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
@@ -74,6 +75,7 @@ class SiteSetting extends Model
                 ],
             ],
             'brand_website_url' => self::get('brand_website_url'),
+            'card_catalog' => CardCatalog::forPublicApi(),
         ];
     }
 
