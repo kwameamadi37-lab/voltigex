@@ -1,0 +1,92 @@
+.form-step {
+    display: none;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.5s ease;
+}
+.form-step.active {
+    display: block;
+    opacity: 1;
+    transform: translateY(0);
+}
+.progress-line {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #e5e7eb;
+    z-index: 1;
+}
+.progress-fill {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    height: 2px;
+    background: #1e3a8a;
+    z-index: 2;
+    transition: width 0.3s ease;
+}
+.step-circle {
+    position: relative;
+    z-index: 10;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+.step-circle.active {
+    background: #1e3a8a;
+    color: white;
+}
+.step-circle.completed {
+    background: #1e3a8a;
+    color: white;
+}
+.radio-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+.radio-item {
+    position: relative;
+    cursor: pointer;
+}
+.radio-item input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+}
+.radio-item label {
+    display: block;
+    padding: 1rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+.radio-item input[type="radio"]:checked + label {
+    border-color: #1e3a8a;
+    background: rgba(30, 58, 138, 0.05);
+}
+.success-container {
+    text-align: center;
+    padding: 3rem 1rem;
+}
+.success-icon {
+    width: 80px;
+    height: 80px;
+    background: #dcfce7;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 2rem;
+    font-size: 2rem;
+    color: #22c55e;
+}

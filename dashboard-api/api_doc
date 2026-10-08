@@ -1,0 +1,746 @@
+# Documentation API — Voltigex (Laravel `dashboard-api`)
+
+Document de référence aligné sur le code actuel (`routes/api.php`, contrôleurs, migrations).  
+**Préfixe des routes HTTP** : `/api` (groupe défini par Laravel).
+
+**Base URL (exemples)** :
+
+- Développement : `http://127.0.0.1:8000/api` ou `http://<hôte>:<port>/api`
+- Production : à adapter selon le déploiement (`APP_URL` dans `.env`)
+
+**Authentification mobile** : **Laravel Sanctum** — en-tête pour les routes protégées :
+
+```http
+Authorization: Bearer {plainTextToken}
+Accept: application/json
+```
+
+Le jeton est renvoyé par **POST `/api/auth/login`** dans `data.token` (voir section Auth).
+
+---
+
+## Sommaire rapide — routes `/api`
+
+| Méthode | Endpoint (relatif à `/api`) | Middleware | Contrôleur | Méthode |
+|--------|-----------------------------|------------|------------|---------|
+| **Sans auth (préfixe `auth`)** | | | | |
+| POST | `auth/register` | — | `AuthApiController` | `register` |
+| POST | `auth/register/photo` | — | `AuthApiController` | `uploadPhoto` |
+| POST | `auth/verify` | — | `AuthApiController` | `verify` |
+| POST | `auth/resend-code` | — | `AuthApiController` | `resendCode` |
+| POST | `auth/login` | — | `AuthApiController` | `login` |
+| POST | `auth/mobile-login` | — | `AppController` | `mobileLogin` |
+| **Avec Sanctum** | | | | |
+| GET | `user-info/{id}` | `auth:sanctum` | `AppController` | `getUserInfo` |
+| GET | `user-account/{id}/status` | `auth:sanctum` | `AppController` | `getAccountStatus` |
+| POST | `user/{id}/card/activate` | `auth:sanctum` | `AppController` | `activateCard` |
+| POST | `auth/logout` | `auth:sanctum` | `AuthApiController` | `logout` |
+| POST | `auth/logout-all` | `auth:sanctum` | `AuthApiController` | `logoutAll` |
+| GET | `user` | `auth:sanctum` | *closure* `routes/api.php` | — |
+| **Préfixe `user`** | | `auth:sanctum` | | |
+| PUT | `user/profile` | | `UtilisateurController` | `profilstore` |
+| PUT | `user/password` | | `UtilisateurController` | `updatepassword` |
+| GET | `user/notifications` | | `UtilisateurController` | `notifications` |
+| POST | `user/notifications/{id}/read` | | `UtilisateurController` | `markNotificationAsRead` |
+| POST | `user/notifications/mark-all-read` | | `UtilisateurController` | `markAllNotificationsAsRead` |
+| GET | `user/notifications/count` | | `UtilisateurController` | `getUnreadNotificationsCount` |
+| GET | `user/notifications/recent` | | `UtilisateurController` | `getRecentNotifications` |
+| POST | `user/fcm-token` | | `Api\UserFcmTokenController` | `store` |
+| GET | `user/dashboard` | | `UtilisateurController` | `carte` |
+| GET | `user/virements` | | `UtilisateurController` | `virements` |
+| **Préfixe `virements`** | | `auth:sanctum` | | |
+| POST | `virements` | | `VirementController` | `virementstore` |
+| GET | `virements/{id}/progress` | | `UtilisateurController` | `virementProgress` |
+| POST | `virements/{id}/confirm` | | `UtilisateurController` | `confirmVirement` |
+| **Préfixe `card`** | | `auth:sanctum` | | |
+| POST | `card/activate` | | `VirementController` | `activationStore` |
+| **Préfixe `chat`** | | `auth:sanctum` | | |
+| GET | `chat/conversations` | | `Api\ChatController` | `getConversations` |
+| GET | `chat/conversations/with-support` | | `Api\ChatController` | `getSupportConversation` |
+| GET | `chat/conversations/with-user/{user}` | | `Api\ChatController` | `getOrCreateConversationWithUser` |
+| GET | `chat/conversations/{conversation}` | | `Api\ChatController` | `getMessages` |
+| PATCH | `chat/conversations/{conversation}/read` | | `Api\ChatController` | `markConversationRead` |
+| POST | `chat/messages` | | `Api\ChatController` | `sendMessage` |
+| POST | `chat/messages/upload` | | `Api\ChatController` | `uploadMedia` |
+
+**Fichiers utiles** :  
+`routes/api.php`, `routes/channels.php`, `app/Providers/BroadcastServiceProvider.php`,  
+`app/Http/Controllers/AuthApiController.php`, `AppController.php`, `UtilisateurController.php`, `VirementController.php`,  
+`app/Http/Controllers/Api/ChatController.php`, `app/Http/Controllers/Api/UserFcmTokenController.php`,  
+`app/Events/MessageSent.php`, `app/Jobs/SendChatMessageNotification.php`.
+
+---
+
+## 1. Auth (inscription, vérification, login)
+
+Les détails de validation et les messages d’erreur sont implémentés dans `AuthApiController`.  
+Ci-dessous : contrat général tel que défini dans le code.
+
+### 1.1 `POST /api/auth/register`
+
+- **Public**, multipart (fichiers `piece_identite`, `avis_imposition`).
+- Champs typiques : `nom`, `prenom`, `email`, `phone`, `password`, fichiers KYC.
+- Réponses : `422` avec `errors` si validation échoue ; succès selon logique du contrôleur (étape suivante).
+
+### 1.2 `POST /api/auth/register/photo`
+
+- **Public**, étape photo carte d’identité (voir contrôleur).
+
+### 1.3 `POST /api/auth/verify`
+
+- **Public**, vérification email/téléphone avec code (voir contrôleur).
+
+### 1.4 `POST /api/auth/resend-code`
+
+- **Public**, renvoi de code (limites possibles, voir contrôleur).
+
+### 1.5 `POST /api/auth/login`
+
+- **Public**, body JSON : `email`, `password`.
+- Succès **200** : structure typique :
+
+```json
+{
+  "success": true,
+  "message": "Connexion réussie.",
+  "data": {
+    "user": {
+      "id": 1,
+      "email": "user@example.com",
+      "phone": "+33...",
+      "alias": "...",
+      "role": "user",
+      "email_verified": true,
+      "phone_verified": true,
+      "email_and_phone_verified": true
+    },
+    "token": "1|xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  }
+}
+```
+
+- **401** : identifiants incorrects.  
+- **403** : compte bloqué (`is_blocked`).  
+- **429** : limitation de débit (rate limiting).  
+- Le token Sanctum est le **jeton en clair** (`plainTextToken`) — à envoyer en `Authorization: Bearer`.
+
+### 1.6 `POST /api/auth/mobile-login`
+
+- **Public**, implémenté dans `AppController::mobileLogin` (alternative au login classique).
+
+### 1.7 `POST /api/auth/logout` — 🔒 Protégé
+
+- Révoque le **token courant** : `$request->user()->currentAccessToken()->delete()`.
+- Met `is_online` à `false`.
+
+### 1.8 `POST /api/auth/logout-all` — 🔒 Protégé
+
+- Révoque **tous** les tokens Sanctum de l’utilisateur : `$user->tokens()->delete()`.
+
+---
+
+## 2. Utilisateur courant
+
+### `GET /api/user` — 🔒
+
+- Retourne un JSON avec `id`, `email`, `phone`, `alias`, `role`, états de vérification (voir closure dans `routes/api.php`).
+
+---
+
+## 3. Profil & mot de passe (`user`)
+
+### `PUT /api/user/profile` — 🔒
+
+- Mise à jour profil : `UtilisateurController::profilstore`.
+
+### `PUT /api/user/password` — 🔒
+
+- Changement de mot de passe : `UtilisateurController::updatepassword`.
+
+---
+
+## 4. Infos utilisateur / carte (routes utilitaires)
+
+### `GET /api/user-info/{id}` — 🔒
+
+### `GET /api/user-account/{id}/status` — 🔒
+
+### `POST /api/user/{id}/card/activate` — 🔒
+
+---
+
+## 5. Notifications
+
+### `GET /api/user/notifications` — 🔒
+
+### `POST /api/user/notifications/{id}/read` — 🔒
+
+### `POST /api/user/notifications/mark-all-read` — 🔒
+
+### `GET /api/user/notifications/count` — 🔒
+
+### `GET /api/user/notifications/recent` — 🔒
+
+---
+
+## 6. FCM (push mobile)
+
+### `POST /api/user/fcm-token` — 🔒
+
+- **Body JSON** :
+  - `fcm_token` (string, requis)
+  - `device_type` (optionnel : `android` | `ios` | `web`)
+- **Réponse 201** : `{ "ok": true, "id": <id en base> }`
+- Enregistrement ou mise à jour : `UserFcmToken::updateOrCreate` sur `(user_id, fcm_token)`.
+
+---
+
+## 7. Dashboard & virements (côté compte)
+
+### `GET /api/user/dashboard` — 🔒
+
+- `UtilisateurController::carte` (données dashboard / carte).
+
+### `GET /api/user/virements` — 🔒
+
+- Liste / historique virements utilisateur.
+
+### `POST /api/virements` — 🔒
+
+- Création d’un virement : `VirementController::virementstore`.
+
+### `GET /api/virements/{id}/progress` — 🔒
+
+### `POST /api/virements/{id}/confirm` — 🔒
+
+### `POST /api/card/activate` — 🔒
+
+- Activation carte : `VirementController::activationStore`.
+
+---
+
+## 8. Chat (support 1:1 utilisateur ↔ admin)
+
+Toutes les routes sont sous **`/api/chat`** et **`auth:sanctum`**.
+
+Règles métier (résumé, voir `ChatController::assertSupportAccess`) :
+
+- Un utilisateur **non admin** ne peut accéder qu’aux conversations où l’**autre participant** a le rôle **`admin`** (support uniquement).
+- Les **admins** ont un accès plus large aux conversations (liste côté admin).
+- Les paires de participants sont **normalisées** (min/max) dans le modèle `Conversation` pour éviter les doublons inversés.
+
+### 8.1 `GET /api/chat/conversations`
+
+- Liste des conversations avec dernier message (format JSON produit par `getConversations`).
+
+### 8.2 `GET /api/chat/conversations/with-support`
+
+- Pour un **utilisateur standard** : crée ou retourne la conversation avec l’admin support.
+- Admin cible : **`SUPPORT_ADMIN_ID`** dans `.env` si défini et rôle `admin`, sinon **premier** utilisateur `role = admin`.
+- **422** si aucun admin ou si l’utilisateur connecté est lui-même l’admin.
+- Réponse typique (succès) :
+
+```json
+{
+  "conversation_id": 1,
+  "participant": {
+    "id": 2,
+    "nom": "...",
+    "prenom": "...",
+    "alias": "...",
+    "email": "...",
+    "role": "admin",
+    "display_name": "Nom Prénom"
+  },
+  "data": [ /* messages, voir format message 8.5 */ ]
+}
+```
+
+### 8.3 `GET /api/chat/conversations/with-user/{user}`
+
+- Création / récupération conversation avec un utilisateur donné (réservé au flux admin / cas contrôlé — voir contrôleur).
+
+### 8.4 `GET /api/chat/conversations/{conversation}`
+
+- Messages de la conversation (pagination / structure selon `getMessages`).
+
+### 8.5 `PATCH /api/chat/conversations/{conversation}/read`
+
+- Marque la conversation comme lue pour l’utilisateur connecté.
+
+### 8.6 `POST /api/chat/messages`
+
+- Envoi d’un message (texte ou média). Déclenche notamment `MessageSent` (broadcast) et le job `SendChatMessageNotification` pour FCM (file d’attente).
+
+### 8.7 `POST /api/chat/messages/upload`
+
+- **Multipart** : champ fichier `file` (validation dans le contrôleur, taille max 50 Mo côté code).
+- Réponse JSON : `url`, `type`, `width`, `height`, `blurhash`, `size`, `originalName` (chemins publics via `storage`).
+
+### Format des messages (extrait `ChatController::formatMessagePayload`)
+
+Champs principaux : `id`, `conversation_id`, `type` (`text` | `media`), `internal_type`, `content`, `media_type`, `media_url`, `thumbnail_url`, `media_width`, `media_height`, `blurhash`, `metadata`, `is_read`, `is_pinned`, `is_deleted`, `sender`, `sender_id`, `created_at` (ISO 8601).
+
+---
+
+## 9. Broadcasting (temps réel) — Pusher / Laravel Echo
+
+- **Authentification des canaux privés** : `POST /broadcasting/auth`  
+  - Middleware : **`auth:sanctum`** (voir `BroadcastServiceProvider`).
+- **Canal** dans `routes/channels.php` : `chat.{conversationId}`  
+  - L’événement Laravel utilise `PrivateChannel('chat.' . $conversation_id)` → côté client Pusher, le nom abonné est en pratique **`private-chat.{conversationId}`**.
+- Autorisation : l’utilisateur doit être **participant** de la conversation (`Conversation::hasParticipant`).
+
+Événement : `App\Events\MessageSent` (nom d’événement à écouter côté client selon configuration broadcasting, souvent `MessageSent` ou `App\\Events\\MessageSent` selon le driver).
+
+---
+
+## 10. Structure de la base de données (MySQL)
+
+Schéma tel que défini par les **migrations** dans `database/migrations/`.  
+Les clés étrangères et index sont ceux des fichiers de migration.
+
+### 10.1 `users`
+
+| Colonne | Type (migration) | Notes |
+|--------|------------------|--------|
+| `id` | bigint PK | |
+| `role` | string, défaut `user` | ex. `admin` |
+| `nom`, `prenom` | string | |
+| `phone` | string nullable | |
+| `alias` | string unique | |
+| `numero_bancaire` | string unique | |
+| `card_number` | string(19) unique | |
+| `iban` | string unique | |
+| `bic` | string | |
+| `date_exp` | date nullable | |
+| `cvv` | string(4) nullable | |
+| `solde` | decimal(10,2), défaut 0 | |
+| `piece_identite`, `avis_imposition`, `photo_carte_identite` | string nullable | chemins fichiers |
+| `account_status` | tinyint, défaut 0 | commentaire migration : 0 inactive, 1 active |
+| `email` | string unique | |
+| `devise` | string, défaut `€` | |
+| `card_active` | boolean, défaut false | |
+| `card_attente` | boolean, défaut false | migration `add_card_attente_to_users_table` |
+| `email_verified_at`, `phone_verified_at` | timestamp nullable | |
+| `password` | string | |
+| `kyc_status` | enum | `pending`, `in_progress`, `approved`, `rejected`, `expired` |
+| `kyc_submitted_at`, `kyc_approved_at` | timestamp nullable | |
+| `kyc_rejection_reason` | text nullable | |
+| `ip_address`, `last_ip_address` | string nullable | |
+| `country`, `last_country` | string nullable | |
+| `is_blocked`, `is_online` | boolean | |
+| `remember_token` | string nullable | |
+| `created_at`, `updated_at` | timestamps | |
+
+### 10.2 `personal_access_tokens` (Sanctum)
+
+| Colonne | Notes |
+|--------|--------|
+| `id`, `tokenable_type`, `tokenable_id` (morphs), `name`, `token` (unique), `abilities`, `last_used_at`, `expires_at`, timestamps | |
+
+### 10.3 `conversations`
+
+| Colonne | Notes |
+|--------|--------|
+| `id` | PK |
+| `user_one_id`, `user_two_id` | FK → `users.id`, **unique** `(user_one_id, user_two_id)` |
+| `timestamps` | |
+
+### 10.4 `messages`
+
+| Colonne | Notes |
+|--------|--------|
+| `id` | PK |
+| `conversation_id` | FK → `conversations`, cascade delete |
+| `user_id` | FK → `users`, cascade delete |
+| `type` | string(10), défaut `text` — `text` ou `media` |
+| `internal_type` | string nullable | |
+| `content` | text nullable | |
+| `media_type` | string(20) nullable | |
+| `media_url`, `thumbnail_url` | text nullable | |
+| `media_width`, `media_height` | unsigned int nullable | |
+| `blurhash` | string nullable | |
+| `metadata` | json nullable | |
+| `is_read`, `is_pinned`, `is_deleted` | boolean | |
+| `timestamps` | index `(conversation_id, created_at)` |
+
+### 10.5 `contacts`
+
+| Colonne | Notes |
+|--------|--------|
+| `id` | PK |
+| `user_id`, `contact_id` | FK → `users`, **unique** `(user_id, contact_id)` |
+| `timestamps` | |
+
+### 10.6 `user_fcm_tokens`
+
+| Colonne | Notes |
+|--------|--------|
+| `id` | PK |
+| `user_id` | FK → `users`, cascade |
+| `fcm_token` | varchar(512) | indexable pour contrainte unique avec `user_id` |
+| `device_type` | enum `android`, `ios`, `web` nullable |
+| `timestamps` | **unique** `(user_id, fcm_token)` |
+
+### 10.7 `virements`
+
+| Colonne | Notes |
+|--------|--------|
+| `id` | PK |
+| `nom`, `prenom`, `nombanque`, `titulairebanque`, `iban` | string |
+| `bic` | string nullable |
+| `montant`, `pourcentage` (défaut `60`), `statut` (défaut `En traitement`), `code` | string |
+| `user_id` | integer |
+| `timestamps` | |
+
+### 10.8 `notifications`
+
+| Colonne | Notes |
+|--------|--------|
+| `id` | PK |
+| `user_id` | FK → users, cascade |
+| `type`, `titre` | string |
+| `message` | text |
+| `icon`, `icon_color` | string nullable |
+| `is_read` | boolean défaut false |
+| `timestamps` | |
+
+### 10.9 `historiques`
+
+| Colonne | Notes |
+|--------|--------|
+| `id` | PK |
+| `titre`, `montant`, `type`, `date_transaction` | string |
+| `user_id` | integer |
+| `timestamps` | |
+
+### 10.10 `finances`
+
+| Colonne | Notes |
+|--------|--------|
+| `id` | PK |
+| `nom`, `email` | string |
+| `date_naissance`, `telephone`, `profession`, `type_credit` | nullable / string |
+| `montant` | decimal(15,2) |
+| `duree` | int nullable (mois) |
+| `timestamps` | |
+
+### 10.11 `user_logs`
+
+| Colonne | Notes |
+|--------|--------|
+| `id` | PK |
+| `user_id` | FK nullable → users, null on delete |
+| `action`, `event_type` | string |
+| `description` | text nullable |
+| `metadata` | json nullable |
+| `ip_address`, `user_agent`, `session_id` | nullable |
+| `timestamps` | |
+
+### 10.12 Tables Laravel / file d’attente
+
+- **`jobs`** : file d’attente **database** (`QUEUE_CONNECTION=database` dans `.env`) — requise pour `php artisan queue:work` / `queue:listen`. Migration : `create_jobs_table`.
+- **`password_resets`** : `email`, `token`, `created_at` (nullable).
+- **`failed_jobs`** : `uuid`, `connection`, `queue`, `payload`, `exception`, `failed_at`.
+
+---
+
+### 10.13 Scripts SQL (MySQL / MariaDB) — création des tables
+
+Ces scripts correspondent aux migrations Laravel (types habituels : `utf8mb4`, moteur `InnoDB`).  
+**Ordre d’exécution** : respecter l’ordre ci-dessous pour satisfaire les clés étrangères.  
+Sur une base existante, utiliser plutôt `php artisan migrate` ; ces `CREATE` servent de référence ou pour une installation manuelle.
+
+```sql
+-- ---------------------------------------------------------------------------
+-- 1. users (inclut la colonne card_attente ajoutée par migration ultérieure)
+-- ---------------------------------------------------------------------------
+CREATE TABLE `users` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `role` varchar(255) NOT NULL DEFAULT 'user',
+  `nom` varchar(255) NOT NULL,
+  `prenom` varchar(255) NOT NULL,
+  `phone` varchar(255) DEFAULT NULL,
+  `alias` varchar(255) NOT NULL,
+  `numero_bancaire` varchar(255) NOT NULL,
+  `card_number` varchar(19) NOT NULL,
+  `iban` varchar(255) NOT NULL,
+  `bic` varchar(255) NOT NULL,
+  `date_exp` date DEFAULT NULL,
+  `cvv` varchar(4) DEFAULT NULL,
+  `solde` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `piece_identite` varchar(255) DEFAULT NULL,
+  `avis_imposition` varchar(255) DEFAULT NULL,
+  `photo_carte_identite` varchar(255) DEFAULT NULL,
+  `account_status` tinyint NOT NULL DEFAULT '0' COMMENT '0=inactive, 1=active',
+  `email` varchar(255) NOT NULL,
+  `devise` varchar(255) NOT NULL DEFAULT '€',
+  `card_active` tinyint(1) NOT NULL DEFAULT '0',
+  `card_attente` tinyint(1) NOT NULL DEFAULT '0',
+  `email_verified_at` timestamp NULL DEFAULT NULL,
+  `phone_verified_at` timestamp NULL DEFAULT NULL,
+  `password` varchar(255) NOT NULL,
+  `kyc_status` enum('pending','in_progress','approved','rejected','expired') NOT NULL DEFAULT 'pending',
+  `kyc_submitted_at` timestamp NULL DEFAULT NULL,
+  `kyc_approved_at` timestamp NULL DEFAULT NULL,
+  `kyc_rejection_reason` text DEFAULT NULL,
+  `ip_address` varchar(255) DEFAULT NULL,
+  `last_ip_address` varchar(255) DEFAULT NULL,
+  `country` varchar(255) DEFAULT NULL,
+  `last_country` varchar(255) DEFAULT NULL,
+  `is_blocked` tinyint(1) NOT NULL DEFAULT '0',
+  `is_online` tinyint(1) NOT NULL DEFAULT '0',
+  `remember_token` varchar(100) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `users_alias_unique` (`alias`),
+  UNIQUE KEY `users_numero_bancaire_unique` (`numero_bancaire`),
+  UNIQUE KEY `users_card_number_unique` (`card_number`),
+  UNIQUE KEY `users_iban_unique` (`iban`),
+  UNIQUE KEY `users_email_unique` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- 2. personal_access_tokens (Laravel Sanctum)
+-- ---------------------------------------------------------------------------
+CREATE TABLE `personal_access_tokens` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `tokenable_type` varchar(255) NOT NULL,
+  `tokenable_id` bigint unsigned NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `token` varchar(64) NOT NULL,
+  `abilities` text DEFAULT NULL,
+  `last_used_at` timestamp NULL DEFAULT NULL,
+  `expires_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `personal_access_tokens_token_unique` (`token`),
+  KEY `personal_access_tokens_tokenable_type_tokenable_id_index` (`tokenable_type`,`tokenable_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- 3. conversations
+-- ---------------------------------------------------------------------------
+CREATE TABLE `conversations` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `user_one_id` bigint unsigned NOT NULL,
+  `user_two_id` bigint unsigned NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `conversations_user_one_id_user_two_id_unique` (`user_one_id`,`user_two_id`),
+  KEY `conversations_user_two_id_foreign` (`user_two_id`),
+  CONSTRAINT `conversations_user_one_id_foreign` FOREIGN KEY (`user_one_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `conversations_user_two_id_foreign` FOREIGN KEY (`user_two_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- 4. messages
+-- ---------------------------------------------------------------------------
+CREATE TABLE `messages` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `conversation_id` bigint unsigned NOT NULL,
+  `user_id` bigint unsigned NOT NULL,
+  `type` varchar(10) NOT NULL DEFAULT 'text',
+  `internal_type` varchar(255) DEFAULT NULL,
+  `content` text DEFAULT NULL,
+  `media_type` varchar(20) DEFAULT NULL,
+  `media_url` text DEFAULT NULL,
+  `thumbnail_url` text DEFAULT NULL,
+  `media_width` int unsigned DEFAULT NULL,
+  `media_height` int unsigned DEFAULT NULL,
+  `blurhash` varchar(255) DEFAULT NULL,
+  `metadata` json DEFAULT NULL,
+  `is_read` tinyint(1) NOT NULL DEFAULT '0',
+  `is_pinned` tinyint(1) NOT NULL DEFAULT '0',
+  `is_deleted` tinyint(1) NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `messages_conversation_id_created_at_index` (`conversation_id`,`created_at`),
+  KEY `messages_user_id_foreign` (`user_id`),
+  CONSTRAINT `messages_conversation_id_foreign` FOREIGN KEY (`conversation_id`) REFERENCES `conversations` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `messages_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- 5. contacts
+-- ---------------------------------------------------------------------------
+CREATE TABLE `contacts` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint unsigned NOT NULL,
+  `contact_id` bigint unsigned NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `contacts_user_id_contact_id_unique` (`user_id`,`contact_id`),
+  KEY `contacts_contact_id_foreign` (`contact_id`),
+  CONSTRAINT `contacts_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `contacts_contact_id_foreign` FOREIGN KEY (`contact_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- 6. user_fcm_tokens
+-- ---------------------------------------------------------------------------
+CREATE TABLE `user_fcm_tokens` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint unsigned NOT NULL,
+  `fcm_token` varchar(512) NOT NULL,
+  `device_type` enum('android','ios','web') DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `user_fcm_tokens_user_id_fcm_token_unique` (`user_id`,`fcm_token`),
+  CONSTRAINT `user_fcm_tokens_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- 7. virements (user_id : integer dans la migration, pas de FK déclarée)
+-- ---------------------------------------------------------------------------
+CREATE TABLE `virements` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `nom` varchar(255) NOT NULL,
+  `prenom` varchar(255) NOT NULL,
+  `nombanque` varchar(255) NOT NULL,
+  `titulairebanque` varchar(255) NOT NULL,
+  `iban` varchar(255) NOT NULL,
+  `bic` varchar(255) DEFAULT NULL,
+  `montant` varchar(255) NOT NULL,
+  `pourcentage` varchar(255) NOT NULL DEFAULT '60',
+  `statut` varchar(255) NOT NULL DEFAULT 'En traitement',
+  `code` varchar(255) NOT NULL,
+  `user_id` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- 8. notifications
+-- ---------------------------------------------------------------------------
+CREATE TABLE `notifications` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint unsigned NOT NULL,
+  `type` varchar(255) NOT NULL,
+  `titre` varchar(255) NOT NULL,
+  `message` text NOT NULL,
+  `icon` varchar(255) DEFAULT NULL,
+  `icon_color` varchar(255) DEFAULT NULL,
+  `is_read` tinyint(1) NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `notifications_user_id_foreign` (`user_id`),
+  CONSTRAINT `notifications_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- 9. historiques (user_id : integer dans la migration, pas de FK déclarée)
+-- ---------------------------------------------------------------------------
+CREATE TABLE `historiques` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `titre` varchar(255) NOT NULL,
+  `montant` varchar(255) NOT NULL,
+  `type` varchar(255) NOT NULL,
+  `date_transaction` varchar(255) NOT NULL,
+  `user_id` int NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- 10. finances
+-- ---------------------------------------------------------------------------
+CREATE TABLE `finances` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `nom` varchar(255) NOT NULL,
+  `date_naissance` date DEFAULT NULL,
+  `email` varchar(255) NOT NULL,
+  `telephone` varchar(255) DEFAULT NULL,
+  `profession` varchar(255) DEFAULT NULL,
+  `type_credit` varchar(255) DEFAULT NULL,
+  `montant` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `duree` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- 11. user_logs
+-- ---------------------------------------------------------------------------
+CREATE TABLE `user_logs` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint unsigned DEFAULT NULL,
+  `action` varchar(255) NOT NULL,
+  `event_type` varchar(255) NOT NULL,
+  `description` text DEFAULT NULL,
+  `metadata` json DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text DEFAULT NULL,
+  `session_id` varchar(100) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `user_logs_user_id_foreign` (`user_id`),
+  CONSTRAINT `user_logs_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- 12. jobs (file d’attente driver "database")
+-- ---------------------------------------------------------------------------
+CREATE TABLE `jobs` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `queue` varchar(255) NOT NULL,
+  `payload` longtext NOT NULL,
+  `attempts` tinyint unsigned NOT NULL,
+  `reserved_at` int unsigned DEFAULT NULL,
+  `available_at` int unsigned NOT NULL,
+  `created_at` int unsigned NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `jobs_queue_index` (`queue`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- 13. password_resets (legacy Laravel)
+-- ---------------------------------------------------------------------------
+CREATE TABLE `password_resets` (
+  `email` varchar(255) NOT NULL,
+  `token` varchar(255) NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  KEY `password_resets_email_index` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- 14. failed_jobs
+-- ---------------------------------------------------------------------------
+CREATE TABLE `failed_jobs` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` varchar(255) NOT NULL,
+  `connection` text NOT NULL,
+  `queue` text NOT NULL,
+  `payload` longtext NOT NULL,
+  `exception` longtext NOT NULL,
+  `failed_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `failed_jobs_uuid_unique` (`uuid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+**`user_fcm_tokens.fcm_token` :** type **`varchar(512)`** (et non `TEXT`) pour permettre l’index **UNIQUE** `(user_id, fcm_token)` sous MySQL/InnoDB sans erreur 150.
+
+---
+
+## 11. Variables d’environnement utiles (chat / push)
+
+- **`SUPPORT_ADMIN_ID`** : ID utilisateur admin utilisé pour la route `with-support` (si présent et rôle admin).
+- **Firebase / FCM** : configuration via `kreait/laravel-firebase` et fichier de compte de service (hors périmètre de ce fichier).
+- **Pusher** : `config/broadcasting.php` et `.env` (`PUSHER_APP_*`, etc.).
+
+---
+
+*Dernière mise à jour : générée pour refléter l’état du dépôt (routes, migrations, chat, FCM, broadcasting).*

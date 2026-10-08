@@ -1,0 +1,15 @@
+flutter_native_splash:
+  color: "#ffffff"
+  image: assets/images/Wori_app_logo_blue.png
+  branding: assets/images/Wori_app_logo_blue.png
+  color_dark: "#121212"
+  image_dark: assets/images/Wori_app_logo_dark.png
+  branding_dark: assets/images/Wori_app_logo_dark.png
+
+  android_12:
+    image: assets/images/Wori_app_logo_blue.png
+    icon_background_color: "#ffffff"
+    image_dark: assets/images/Wori_app_logo_blue.png
+    icon_background_color_dark: "#121212"
+
+  web: false

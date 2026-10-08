@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "310558292937",
+    "project_id": "wori-app-7d380",
+    "storage_bucket": "wori-app-7d380.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:310558292937:android:c75afa5b5f5410a4798618",
+        "android_client_info": {
+          "package_name": "com.example.wori_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBKtIiEHy_3otzFWCNDB-WcuJFiGvGHl-I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

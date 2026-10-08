@@ -1,0 +1,385 @@
+.auth-container {
+  min-height: 100vh;
+  background-color: var(--gray-100);
+  display: flex;
+  flex-direction: column;
+}
+
+.logo-container {
+  background-color: var(--black);
+  padding: 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.auth-logo {
+  width: 5rem;
+  height: 5rem;
+  object-fit: contain;
+}
+
+.auth-content {
+  flex: 1;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-header {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  color: var(--primary);
+  margin-bottom: 2rem;
+  align-self: flex-start;
+}
+
+.back-btn.hidden {
+  display: none;
+}
+
+.back-btn i {
+  margin-right: 0.25rem;
+}
+
+.auth-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+}
+
+.auth-subtitle {
+  color: var(--gray-600);
+}
+
+.progress-bar {
+  height: 0.5rem;
+  background-color: var(--gray-200);
+  border-radius: 9999px;
+  margin-top: 1rem;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: var(--primary);
+  border-radius: 9999px;
+  transition: width 0.3s;
+}
+
+.auth-form {
+  max-width: 28rem;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--gray-700);
+  margin-bottom: 0.25rem;
+}
+
+.form-group input,
+.form-group select {
+  padding: 1rem;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--border-radius);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(10, 41, 107, 0.1);
+}
+
+.password-input {
+  position: relative;
+}
+
+.toggle-password-btn {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gray-500);
+}
+
+.password-requirements {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--gray-500);
+}
+
+.password-requirements p {
+  margin-bottom: 0.25rem;
+}
+
+.password-requirements ul {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+}
+
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+}
+
+.remember-me input {
+  margin-right: 0.5rem;
+}
+
+.forgot-password {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--primary);
+}
+
+.auth-submit-btn {
+  background-color: var(--primary);
+  color: var(--white);
+  font-weight: 500;
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s;
+}
+
+.auth-submit-btn:hover {
+  opacity: 0.9;
+}
+
+.auth-submit-btn i {
+  margin-left: 0.5rem;
+}
+
+.auth-footer {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.auth-footer a {
+  font-weight: 500;
+  color: var(--primary);
+}
+
+.security-info {
+  margin-top: auto;
+  padding-top: 2rem;
+  background-color: var(--white);
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  border: 1px solid var(--gray-200);
+  display: flex;
+  align-items: center;
+}
+
+.security-icon {
+  background-color: var(--blue-50);
+  border-radius: 50%;
+  padding: 0.5rem;
+  margin-right: 0.75rem;
+}
+
+.security-icon i {
+  color: var(--primary);
+}
+
+.security-content {
+  flex: 1;
+}
+
+.security-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--gray-800);
+}
+
+.security-text {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+}
+
+.info-box {
+  background-color: var(--blue-50);
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  display: flex;
+  align-items: flex-start;
+}
+
+.info-box i {
+  color: var(--primary);
+  margin-right: 0.75rem;
+  flex-shrink: 0;
+  margin-top: 0.25rem;
+}
+
+.info-box p {
+  font-size: 0.875rem;
+  color: var(--gray-700);
+}
+
+.file-dropzone {
+  border: 2px dashed var(--gray-300);
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+
+.file-dropzone:hover {
+  border-color: var(--primary);
+}
+
+.file-placeholder {
+  cursor: pointer;
+}
+
+.file-placeholder i {
+  color: var(--gray-400);
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: 0 auto 0.5rem;
+}
+
+.file-format {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  margin-top: 0.25rem;
+}
+
+.file-input {
+  display: none;
+}
+
+.file-preview {
+  position: relative;
+}
+
+.file-preview.hidden {
+  display: none;
+}
+
+.file-preview img {
+  max-height: 10rem;
+  object-fit: contain;
+  margin: 0 auto;
+}
+
+.file-success-icon {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background-color: var(--green-500);
+  color: var(--white);
+  border-radius: 50%;
+  padding: 0.25rem;
+}
+
+.change-file-btn {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--primary);
+}
+
+.privacy-notice {
+  background-color: var(--yellow-50);
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  border: 1px solid var(--yellow-100);
+}
+
+.privacy-notice p {
+  font-size: 0.875rem;
+  color: var(--gray-700);
+}
+
+.step-content {
+  display: none;
+}
+
+.step-content.active {
+  display: flex;
+  flex-direction: column;
+}
+
+.success-content {
+  text-align: center;
+  max-width: 28rem;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.success-icon {
+  background-color: var(--green-100);
+  width: 5rem;
+  height: 5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.5rem;
+}
+
+.success-icon i {
+  color: var(--green-500);
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.success-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 1rem;
+}
+
+.success-message {
+  color: var(--gray-600);
+  margin-bottom: 2rem;
+}
+
+.return-btn {
+  display: inline-block;
+  background-color: var(--primary);
+  color: var(--white);
+  font-weight: 500;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--border-radius);
+  transition: opacity 0.2s;
+}
+
+.return-btn:hover {
+  opacity: 0.9;
+}
