@@ -36,6 +36,11 @@
         </a>
       </li>
       <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('admin.deposits*') ? 'admin-nav-link-active' : '' }}" href="{{ route('admin.deposits') }}">
+          <i class="bi bi-cash-coin"></i> Dépôts
+        </a>
+      </li>
+      <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('adminprofil') ? 'admin-nav-link-active' : '' }}" href="{{ route('adminprofil') }}" role="button" aria-expanded="false" aria-controls="sidebar-profil">
           <i class="bi bi-person"></i> Profil
         </a>

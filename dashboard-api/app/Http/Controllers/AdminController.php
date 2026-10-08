@@ -100,8 +100,8 @@ class AdminController extends Controller
 
             // Enregistrement dans la table historiques
             DB::table('historiques')->insert([
-                'type' => 'debit',
-                'titre' => 'Accredito del conto - ' . $utilisateur->nom . ' ' . $utilisateur->prenom,
+                'type' => 'depot',
+                'titre' => 'Crédit compte - ' . $utilisateur->nom . ' ' . $utilisateur->prenom,
                 'date_transaction' => now(),
                 'montant' => $request->montant,
                 'user_id' => $utilisateur->id,
@@ -111,8 +111,8 @@ class AdminController extends Controller
             // Création de la notification
             DB::table('notifications')->insert([
                 'user_id' => $utilisateur->id,
-                'type' => 'debit',
-                'titre' => 'Accredito del conto',
+                'type' => 'depot',
+                'titre' => 'Crédit compte',
                 'message' => "Il vostro conto è stato accreditato con {$request->montant} {$utilisateur->devise}",
                 'icon' => 'fa fa-money',
                 'icon_color' => 'text-green-500',

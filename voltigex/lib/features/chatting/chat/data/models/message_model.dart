@@ -1,3 +1,4 @@
+import 'package:path/path.dart' as p;
 import 'package:voltigex/core/media_path_utils.dart';
 import 'package:voltigex/features/chatting/chat/domain/entiies/message_entity.dart';
 
@@ -99,14 +100,35 @@ class MessageModel extends MessageEntity {
     final metaMap = metadataFromJson(json['metadata']);
     final rawClientId = json['client_id'] ?? metaMap?['client_id'];
 
+    String? mediaNameFromMeta;
+    if (metaMap != null) {
+      mediaNameFromMeta = metaMap['originalName']?.toString().trim();
+      if (mediaNameFromMeta != null && mediaNameFromMeta.isEmpty) {
+        mediaNameFromMeta = null;
+      }
+    }
+    final resolvedMediaUrl = _mediaUrlFromApiJson(rawMediaUrl);
+    String? mediaName = mediaNameFromMeta;
+    if ((mediaName == null || mediaName.isEmpty) &&
+        normalizedType == 'MEDIA' &&
+        resolvedMediaUrl != null &&
+        resolvedMediaUrl.isNotEmpty) {
+      mediaName = p.basename(
+        MediaPathUtils.pathForExtension(resolvedMediaUrl),
+      );
+      if (mediaName.isEmpty || mediaName == '.') {
+        mediaName = 'Fichier';
+      }
+    }
+
     return MessageModel(
       id: (json['id'] ?? '').toString(),
       conversationId: (json['conversation_id'] ?? '').toString(),
       senderId: (json['sender_id'] ?? senderObj?['id'] ?? '').toString(),
       content: json['content'] as String?,
       type: normalizedType,
-      mediaName: metaMap != null ? metaMap['originalName'] as String? : null,
-      mediaUrl: _mediaUrlFromApiJson(rawMediaUrl),
+      mediaName: mediaName,
+      mediaUrl: resolvedMediaUrl,
       mediaType: json['media_type'] as String?,
       mediaWidth: (json['media_width'] as num?)?.toInt(),
       mediaHeight: (json['media_height'] as num?)?.toInt(),

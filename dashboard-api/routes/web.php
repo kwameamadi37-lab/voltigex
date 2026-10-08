@@ -93,6 +93,8 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::put('/admin/settings', [App\Http\Controllers\AdminSiteSettingsController::class, 'update'])->name('admin.settings.update');
     Route::get('/admin/compose-mail', [App\Http\Controllers\AdminComposeMailController::class, 'create'])->name('admin.compose-mail');
     Route::post('/admin/compose-mail', [App\Http\Controllers\AdminComposeMailController::class, 'send'])->name('admin.compose-mail.send');
+    Route::get('/admin/deposits', [App\Http\Controllers\AdminDepositController::class, 'create'])->name('admin.deposits');
+    Route::post('/admin/deposits', [App\Http\Controllers\AdminDepositController::class, 'store'])->name('admin.deposits.store');
 });
 
 // Route pour la page login

@@ -6,6 +6,8 @@ import 'package:voltigex/core/theme.dart';
 import 'package:voltigex/core/widgets.dart';
 import 'package:voltigex/features/dashboard/domain/entities/transaction_entity.dart';
 import 'package:voltigex/features/dashboard/shared/presentation/widgets/empty_transaction_state.dart';
+import 'package:voltigex/features/dashboard/shared/presentation/widgets/transaction_amount_style.dart';
+import 'package:intl/intl.dart';
 import 'package:voltigex/features/dashboard/transfer/presentation/bloc/transfers_history_bloc.dart';
 import 'package:voltigex/features/dashboard/transfer/presentation/bloc/transfers_history_event.dart';
 import 'package:voltigex/features/dashboard/transfer/presentation/bloc/transfers_history_state.dart';
@@ -198,8 +200,21 @@ Widget _listVirements(
   List<TransactionEntity> transfers,
   String currencySymbol,
 ) {
+  final money = NumberFormat.currency(
+    locale: Localizations.localeOf(context).toString(),
+    symbol: currencySymbol,
+    decimalDigits: 2,
+  );
+
   return Column(
     children: transfers.map((transfer) {
+      final isDeposit = TransactionAmountStyle.isDeposit(transfer);
+      final amountColor = TransactionAmountStyle.amountColor(transfer);
+      final amountText = TransactionAmountStyle.formattedAmount(
+        transfer,
+        (v) => money.format(v),
+      );
+
       return Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
@@ -236,11 +251,9 @@ Widget _listVirements(
                 ),
                 const SizedBox(width: 8),
                 Icon(
-                  transfer.isIncoming
-                      ? Icons.arrow_circle_up
-                      : Icons.arrow_circle_down,
-                  color: transfer.status == 'REUSSI' ? Colors.green : Colors.red,
-                  size: 30.0,
+                  TransactionAmountStyle.listIcon(transfer),
+                  color: TransactionAmountStyle.iconColor(transfer),
+                  size: 28,
                 ),
               ],
             ),
@@ -252,27 +265,25 @@ Widget _listVirements(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${transfer.amount.toStringAsFixed(2)} $currencySymbol',
+                      amountText,
                       style: GoogleFonts.inter(
                         textStyle: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 15.5,
-                          color: transfer.status == 'REUSSI'
-                              ? Colors.green
-                              : Colors.red,
+                          color: amountColor,
                         ),
                       ),
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      transfer.status == 'REUSSI' ? 'Réussi.' : 'Échoué.',
+                      isDeposit ? 'Dépôt' : 'Virement',
                       style: GoogleFonts.inter(
                         textStyle: TextStyle(
                           fontWeight: FontWeight.w500,
                           fontSize: 12.5,
-                          color: transfer.status == 'REUSSI'
-                              ? Colors.green
-                              : Colors.red,
+                          color: isDeposit
+                              ? const Color(0xFF16A34A)
+                              : Colors.grey.shade700,
                         ),
                       ),
                     ),

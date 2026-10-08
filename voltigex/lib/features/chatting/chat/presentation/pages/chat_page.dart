@@ -271,6 +271,31 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
     return t.startsWith('http://') || t.startsWith('https://');
   }
 
+  static bool _isChatMediaMessage(MessageEntity message) {
+    if (message.type.toUpperCase() == 'MEDIA') return true;
+    final url = message.mediaUrl?.trim();
+    return url != null && url.isNotEmpty;
+  }
+
+  static String _resolveMediaDisplayName(MessageEntity message) {
+    final name = message.mediaName?.trim();
+    if (name != null && name.isNotEmpty) return name;
+    final url = message.mediaUrl?.trim();
+    if (url != null && url.isNotEmpty) {
+      final base = p.basename(MediaPathUtils.pathForExtension(url));
+      if (base.isNotEmpty && base != '.') return base;
+    }
+    return 'Fichier';
+  }
+
+  static bool _messageMediaIsImagePreview(MessageEntity message, String ext) {
+    final mt = (message.mediaType ?? '').toLowerCase();
+    if (mt == 'image') return true;
+    if (mt == 'document' || mt == 'video' || mt == 'audio') return false;
+    const img = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    return img.contains(ext);
+  }
+
   /// Fichier local (cache file_picker, chemin absolu Android/iOS, `file://`, `content://`, lecteur Windows).
   static bool _isLocalFilesystemPath(String s) {
     final t = s.trim();
@@ -1261,15 +1286,15 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
                   margin: EdgeInsets.only(top: bubbleTopMargin),
                   child: ChatBubbleFrame(
                     isMe: false,
-                    child: mediaUrl != null
+                    child: _isChatMediaMessage(message)
                         ? ClipRRect(
                             borderRadius: bubbleRadius,
                             child: _buildMedia(
                               context,
                               message,
                               widget.mate,
-                              mediaName!,
-                              mediaUrl,
+                              _resolveMediaDisplayName(message),
+                              mediaUrl ?? '',
                               mediaWidth,
                               mediaHeight,
                               mediaBlurHash,
@@ -1355,15 +1380,15 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
 
     final Widget bubbleMain = Container(
       margin: EdgeInsets.only(top: bubbleTopMargin),
-      child: mediaUrl != null
+      child: _isChatMediaMessage(message)
           ? ClipRRect(
               borderRadius: bubbleRadius,
               child: _buildMedia(
                 context,
                 message,
                 null,
-                mediaName!,
-                mediaUrl,
+                _resolveMediaDisplayName(message),
+                mediaUrl ?? '',
                 mediaWidth,
                 mediaHeight,
                 mediaBlurHash,
@@ -1756,7 +1781,7 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
     final pathForExt = MediaPathUtils.pathForExtension(mediaUrl);
     final ext = p.extension(pathForExt).toLowerCase();
 
-    final isDocument = ['.pdf', '.doc', '.docx'].contains(ext);
+    final isDocument = !_messageMediaIsImagePreview(message, ext);
     final aspect = (mediaWidth != null && mediaHeight != null && mediaHeight > 0)
         ? mediaWidth / mediaHeight
         : 1.0;
@@ -1788,16 +1813,31 @@ class _ChatPageState extends State<ChatPage>  with AutomaticKeepAliveClientMixin
               decoration: const BoxDecoration(
                 color: DefaultColors.receiverMessage,
               ),
-              child: SvgPicture.asset(
-                ext == '.pdf'
-                    ? 'assets/images/svg/PDF_file_icon.svg'
-                    : 'assets/images/svg/fichier-docx.svg',
-                colorFilter: ColorFilter.mode(
-                  ext == '.pdf' ? Colors.red : Colors.blue,
-                  BlendMode.srcIn,
-                ),
-                width: 30,
-              ),
+              child: ext == '.pdf'
+                  ? SvgPicture.asset(
+                      'assets/images/svg/PDF_file_icon.svg',
+                      colorFilter: const ColorFilter.mode(
+                        Colors.red,
+                        BlendMode.srcIn,
+                      ),
+                      width: 30,
+                    )
+                  : (ext == '.doc' || ext == '.docx')
+                      ? SvgPicture.asset(
+                          'assets/images/svg/fichier-docx.svg',
+                          colorFilter: const ColorFilter.mode(
+                            Colors.blue,
+                            BlendMode.srcIn,
+                          ),
+                          width: 30,
+                        )
+                      : Icon(
+                          (message.mediaType ?? '').toLowerCase() == 'video'
+                              ? Icons.videocam_rounded
+                              : Icons.insert_drive_file_rounded,
+                          color: DefaultColors.blueBackground,
+                          size: 28,
+                        ),
             ),
             const SizedBox(width: 8),
             Flexible(

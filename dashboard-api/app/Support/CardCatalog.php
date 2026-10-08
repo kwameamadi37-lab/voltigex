@@ -63,6 +63,21 @@ class CardCatalog
         return 0.0;
     }
 
+    public static function labelForType(string $type, string $locale = 'fr'): string
+    {
+        $type = strtolower(trim($type));
+        foreach (self::all() as $row) {
+            if (strtolower((string) $row['key']) !== $type) {
+                continue;
+            }
+            $key = 'label_'.$locale;
+
+            return (string) ($row[$key] ?? $row['label_fr'] ?? $row['key']);
+        }
+
+        return $type !== '' ? ucfirst($type) : '—';
+    }
+
     /** @return list<array<string, mixed>> */
     public static function all(): array
     {

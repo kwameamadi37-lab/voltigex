@@ -13,7 +13,9 @@ class MediaPathUtils {
     if (p.isEmpty) return path.trim();
     final lower = p.toLowerCase();
     if (lower.startsWith('storage/')) return p;
-    if (p.startsWith('documents/')) return 'storage/$p';
+    if (p.startsWith('documents/') || p.startsWith('chat_medias/')) {
+      return 'storage/$p';
+    }
     return p;
   }
 

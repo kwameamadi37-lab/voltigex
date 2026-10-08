@@ -37,22 +37,53 @@ class TransactionModel {
   factory TransactionModel.fromJson(Map<String, dynamic> json) =>
       TransactionModel.fromHistoriqueJson(json);
 
+  static bool historiqueIsDeposit(String type, String titre) {
+    final t = type.toLowerCase().trim();
+    final title = titre.toLowerCase();
+
+    if (t == 'depot' || t == 'deposit') return true;
+
+    if (title.contains('accredito') ||
+        title.contains('activation carte') ||
+        title.contains('activation de carte') ||
+        title.contains('crédit compte') ||
+        title.contains('credit compte') ||
+        (title.contains('crédit') && title.contains('compte')) ||
+        (title.contains('credit') && title.contains('compte'))) {
+      return true;
+    }
+
+    if (title.contains('virement') ||
+        title.contains('transfert') ||
+        title.contains(' vers ')) {
+      return false;
+    }
+
+    if (t == 'credit') return false;
+    if (t == 'debit') {
+      return title.contains('accredito') ||
+          title.contains('depot') ||
+          title.contains('dépôt');
+    }
+
+    return t.contains('entr') ||
+        t.contains('reçu') ||
+        t.contains('recu') ||
+        t.contains('depot');
+  }
+
   TransactionEntity toEntity() {
     final raw = montant.replaceAll(' ', '').replaceAll(',', '.');
     final amt = double.tryParse(raw) ?? 0;
-    final t = type.toLowerCase();
-    final incoming = t.contains('credit') ||
-        t.contains('entr') ||
-        t.contains('reçu') ||
-        t.contains('recu');
+    final incoming = historiqueIsDeposit(type, titre);
     return TransactionEntity(
       id: id,
       receiver: titre.isNotEmpty ? titre : '—',
       isIncoming: incoming,
       amount: amt.abs(),
       date: dateTransaction,
-      status: type.isNotEmpty ? type : '—',
-      apiStatut: null,
+      status: 'REUSSI',
+      apiStatut: type,
       supportSlug: null,
     );
   }

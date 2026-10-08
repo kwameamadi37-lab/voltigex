@@ -68,6 +68,7 @@ abstract final class _CardTypeAssets {
 }
 
 const String _kMaskedCardNumber = '**** **** **** ****';
+const String _kMaskedExpiry = '**/**';
 
 String _normalizeCardTier(String cardType) {
   final tier = cardType.toLowerCase().trim();
@@ -254,6 +255,11 @@ class _CardsPageState extends State<CardsPage> {
 
   bool _canEditCardTypeBeforeActivation(CardEntity card) {
     return !card.isActive && !card.isPending;
+  }
+
+  /// Comme le web : date masquée tant que [card.isActive] est faux.
+  String _expiryOnCardFace(CardEntity card) {
+    return card.isActive ? card.expiryDisplay : _kMaskedExpiry;
   }
 
   Widget _tierBackgroundImage(String safeTier) {
@@ -1274,6 +1280,9 @@ class _CardsPageState extends State<CardsPage> {
       remoteConfig: _remoteConfig,
     );
     final balanceFormatted = _cardsMoneyFormat(context).format(displayBalance);
+    final headerBadgeText = card.isActive
+        ? tierLabel.toUpperCase()
+        : '${tierLabel.toUpperCase()} · $balanceFormatted';
 
     return Scaffold(
       backgroundColor: _kCardsBg,
@@ -1322,7 +1331,7 @@ class _CardsPageState extends State<CardsPage> {
                               children: [
                                 Flexible(
                                   child: Text(
-                                    '${tierLabel.toUpperCase()} · $balanceFormatted',
+                                    headerBadgeText,
                                     style: GoogleFonts.inter(
                                       textStyle: const TextStyle(
                                         fontSize: 12.5,
@@ -1371,7 +1380,7 @@ class _CardsPageState extends State<CardsPage> {
                       cardW,
                       cardH,
                       cardType: displayCardType,
-                      showTierBadge: card.isActive && !card.isFrozen,
+                      showTierBadge: false,
                       tierBadgeLabel: tierLabel,
                       dimmed: !card.isActive || card.isFrozen,
                       brandLabel: l10n.cardsBrandVoltigex,
@@ -1379,7 +1388,7 @@ class _CardsPageState extends State<CardsPage> {
                       expiryLabel: l10n.cardsExpiryLabel,
                       holderName: card.holderName,
                       cardNumber: _kMaskedCardNumber,
-                      expiry: card.expiryDisplay,
+                      expiry: _expiryOnCardFace(card),
                       balanceText: balanceFormatted,
                       onDetailsTap: (!card.isActive || loaded.cardActionLoading)
                           ? null

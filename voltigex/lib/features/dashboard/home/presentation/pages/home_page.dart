@@ -23,6 +23,7 @@ import 'package:voltigex/features/dashboard/shell/presentation/bloc/main_navigat
 import 'package:voltigex/features/dashboard/shell/presentation/helpers/support_chat_tab_opener.dart';
 import 'package:voltigex/core/widgets.dart';
 import 'package:voltigex/features/dashboard/shared/presentation/widgets/empty_transaction_state.dart';
+import 'package:voltigex/features/dashboard/shared/presentation/widgets/transaction_amount_style.dart';
 
 /// Fond d’accueil : gris très clair, proche du blanc (style minimaliste).
 const Color _kHomeBackground = Color(0xFFF5F6F8);
@@ -333,7 +334,7 @@ class _HomeDashboardBody extends StatelessWidget {
                           color: Colors.transparent,
                           child: InkWell(
                             borderRadius: BorderRadius.circular(14),
-                            onTap: () => s.id == "deposit" ? null :
+                            onTap: () =>
                                 _homeOnServiceTap(context, homeServices, index),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -358,7 +359,7 @@ class _HomeDashboardBody extends StatelessWidget {
                                     'assets/images/svg/${s.iconPath}',
                                     width: 30,
                                     colorFilter: ColorFilter.mode(
-                                      index == 0 ? DefaultColors.blackColor.withValues(alpha: 0.3) : DefaultColors.blackColor,
+                                      DefaultColors.blackColor,
                                       BlendMode.srcIn,
                                     ),
                                   ),
@@ -369,7 +370,7 @@ class _HomeDashboardBody extends StatelessWidget {
                                       textStyle: TextStyle(
                                         fontWeight: FontWeight.w600,
                                         fontSize: 15.5,
-                                        color: index == 0 ? DefaultColors.blackColor.withValues(alpha: 0.3) : Color(0xFF111827),
+                                        color: const Color(0xFF111827),
                                       ),
                                     ),
                                   ),
@@ -448,6 +449,14 @@ void _homeOnServiceTap(
           create: (_) => sl<TransferBloc>(),
           child: const MakeTransferPage(),
         ),
+      ),
+    );
+    return;
+  }
+  if (s.id == 'deposit') {
+    Navigator.of(context, rootNavigator: false).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const TransfersHistoryPage(),
       ),
     );
     return;
@@ -551,9 +560,11 @@ Widget _homeRecentActivitiesSection(
             itemCount: recent.length,
             itemBuilder: (context, i) {
               final t = recent[i];
-              final amountColor = t.status == 'REUSSI'
-                  ? const Color(0xFF111827)
-                  : Colors.red.shade700;
+              final amountColor = TransactionAmountStyle.amountColor(t);
+              final amountText = TransactionAmountStyle.formattedAmount(
+                t,
+                (v) => _homeMoneyFormat(context, currencySymbol).format(v),
+              );
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 child: Row(
@@ -564,11 +575,9 @@ Widget _homeRecentActivitiesSection(
                       backgroundColor:
                           DefaultColors.blueBackground.withValues(alpha: 0.1),
                       child: Icon(
-                        t.isIncoming
-                            ? Icons.arrow_downward_rounded
-                            : Icons.arrow_upward_rounded,
+                        TransactionAmountStyle.listIcon(t),
                         size: 22,
-                        color: DefaultColors.blueBackground,
+                        color: TransactionAmountStyle.iconColor(t),
                       ),
                     ),
                     const SizedBox(width: 14),
@@ -602,8 +611,7 @@ Widget _homeRecentActivitiesSection(
                       ),
                     ),
                     Text(
-                      _homeMoneyFormat(context, currencySymbol)
-                          .format(t.amount),
+                      amountText,
                       style: GoogleFonts.inter(
                         textStyle: TextStyle(
                           fontWeight: FontWeight.w700,

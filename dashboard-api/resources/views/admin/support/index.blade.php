@@ -70,6 +70,26 @@
             margin-top: 4px;
             opacity: 0.8;
         }
+        .chat-message-bubble.chat-media-bubble {
+            padding: 6px;
+            overflow: hidden;
+        }
+        .chat-message-bubble.chat-media-bubble img {
+            display: block;
+            max-width: min(280px, 100%);
+            max-height: 240px;
+            border-radius: 10px;
+        }
+        .chat-message-bubble .chat-file-link {
+            color: inherit;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .message-admin .chat-file-link {
+            color: #fff;
+        }
         .cursor-pointer {
             cursor: pointer;
         }
@@ -184,7 +204,16 @@
 
                                 <form id="chat-form" class="mt-auto border-top pt-3 d-none">
                                     @csrf
+                                    <input type="file" id="chat-file-input" class="d-none" accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar,.csv">
+                                    <div id="chat-file-preview" class="d-none align-items-center gap-2 mb-2 small text-muted">
+                                        <i class="bi bi-paperclip"></i>
+                                        <span id="chat-file-name"></span>
+                                        <button type="button" class="btn btn-sm btn-link p-0" id="chat-file-clear" aria-label="Retirer">&times;</button>
+                                    </div>
                                     <div class="input-group">
+                                        <button type="button" class="btn btn-outline-secondary" id="chat-attach-btn" title="Joindre une image ou un fichier">
+                                            <i class="bi bi-paperclip"></i>
+                                        </button>
                                         <input type="text" id="chat-message-input" class="form-control" placeholder="Écrire un message au client...">
                                         <button class="btn btn-primary" type="submit">
                                             <i class="bi bi-send"></i>
@@ -255,15 +284,67 @@
         return false;
     }
 
+    function resolveMediaPublicUrl(mediaUrl) {
+        if (!mediaUrl) return '';
+        const raw = String(mediaUrl).trim();
+        if (raw.startsWith('http://') || raw.startsWith('https://')) {
+            return raw;
+        }
+        const path = raw.startsWith('/') ? raw : '/' + raw;
+        return window.location.origin + path;
+    }
+
+    function lastMessagePreview(last) {
+        if (!last) return 'Aucun message';
+        const type = (last.type || '').toLowerCase();
+        if (type === 'media') {
+            const mt = (last.media_type || '').toLowerCase();
+            const meta = last.metadata || {};
+            const name = meta.originalName || 'Fichier';
+            if (mt === 'image') return '🖼 Image';
+            if (mt === 'video') return '🎬 Vidéo';
+            return '📎 ' + name;
+        }
+        return last.content || '[Message]';
+    }
+
+    function buildMessageBubbleContent(msg) {
+        const type = (msg.type || '').toLowerCase();
+        const mediaUrl = msg.media_url;
+        if (type === 'media' && mediaUrl) {
+            const url = resolveMediaPublicUrl(mediaUrl);
+            const mediaType = (msg.media_type || '').toLowerCase();
+            const meta = msg.metadata || {};
+            const name = meta.originalName || 'Fichier';
+            const bubble = $('<div></div>').addClass('chat-message-bubble chat-media-bubble');
+            if (mediaType === 'image') {
+                bubble.append(
+                    $('<a></a>').attr('href', url).attr('target', '_blank').attr('rel', 'noopener')
+                        .append($('<img>').attr('src', url).attr('alt', name))
+                );
+            } else {
+                bubble.append(
+                    $('<a></a>').addClass('chat-file-link').attr('href', url).attr('target', '_blank').attr('rel', 'noopener')
+                        .append($('<i></i>').addClass('bi bi-file-earmark-arrow-down'))
+                        .append($('<span></span>').text(name))
+                );
+            }
+            const caption = (msg.content || '').trim();
+            if (caption) {
+                bubble.append($('<div></div>').addClass('mt-2').text(caption));
+            }
+            return bubble;
+        }
+        return $('<div></div>').addClass('chat-message-bubble').text(msg.content || '[Message]');
+    }
+
     function appendMessageBubble(container, msg) {
         const isAdmin = isAdminSender(msg);
         const wrapper = $('<div></div>')
             .addClass('message-wrapper')
             .addClass(isAdmin ? 'message-admin' : 'message-user');
 
-        const bubble = $('<div></div>')
-            .addClass('chat-message-bubble')
-            .text(msg.content || '[Message]');
+        const bubble = buildMessageBubbleContent(msg);
 
         const meta = $('<div></div>')
             .addClass('chat-message-meta')
@@ -305,7 +386,7 @@
             const displayName = (participant && (participant.display_name || participant.nom || participant.prenom)) ? (participant.display_name || (participant.nom + ' ' + participant.prenom).trim() || participant.alias || participant.email || 'Client #' + participant.id) : ('Conversation #' + conv.id);
             const body = $('<div></div>').addClass('me-auto');
             body.append('<div class="fw-semibold">' + displayName.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>');
-            body.append('<div class="small text-muted text-truncate" style="max-width: 220px;">' + (last ? last.content || '[Message]' : 'Aucun message') + '</div>');
+            body.append('<div class="small text-muted text-truncate" style="max-width: 220px;">' + lastMessagePreview(last) + '</div>');
 
             item.append(body);
 
@@ -580,12 +661,64 @@
         initPusher();
         startMessagesPolling();
 
-        $('#chat-form').on('submit', function (e) {
-            e.preventDefault();
-            const message = $('#chat-message-input').val().trim();
-            if (!currentConversationId || !message) return;
+        let pendingChatFile = null;
 
-            $.ajax({
+        $('#chat-attach-btn').on('click', function () {
+            $('#chat-file-input').trigger('click');
+        });
+
+        $('#chat-file-input').on('change', function () {
+            const file = this.files && this.files[0];
+            pendingChatFile = file || null;
+            if (file) {
+                $('#chat-file-name').text(file.name);
+                $('#chat-file-preview').removeClass('d-none').addClass('d-flex');
+            } else {
+                $('#chat-file-preview').addClass('d-none').removeClass('d-flex');
+                $('#chat-file-name').text('');
+            }
+        });
+
+        $('#chat-file-clear').on('click', function () {
+            pendingChatFile = null;
+            $('#chat-file-input').val('');
+            $('#chat-file-preview').addClass('d-none').removeClass('d-flex');
+            $('#chat-file-name').text('');
+        });
+
+        function storagePathFromUpload(uploadRes) {
+            if (uploadRes.relative_media_url) {
+                return uploadRes.relative_media_url;
+            }
+            const url = uploadRes.url || '';
+            if (url.startsWith('http://') || url.startsWith('https://')) {
+                try {
+                    return new URL(url).pathname.replace(/^\//, '');
+                } catch (err) {
+                    return url;
+                }
+            }
+            return String(url).replace(/^\//, '');
+        }
+
+        function uploadAdminChatFile(file) {
+            const fd = new FormData();
+            fd.append('file', file);
+            return $.ajax({
+                url: '/api/chat/messages/upload',
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json'
+                },
+                data: fd,
+                processData: false,
+                contentType: false
+            });
+        }
+
+        function postAdminChatMessage(payload) {
+            return $.ajax({
                 url: '/api/chat/messages',
                 method: 'POST',
                 headers: {
@@ -593,27 +726,76 @@
                     'Accept': 'application/json'
                 },
                 contentType: 'application/json',
-                data: JSON.stringify({
-                    conversation_id: currentConversationId,
-                    type: 'text',
-                    content: message
-                }),
-                success: function (res) {
-                    $('#chat-message-input').val('');
-                    appendIncomingMessage({
-                        id: res.id,
-                        conversation_id: res.conversation_id || currentConversationId,
-                        content: res.content,
-                        type: res.type,
-                        internal_type: res.internal_type,
-                        sender: {
-                            id: res.sender_id,
-                            role: 'admin'
-                        },
-                        created_at: res.created_at || new Date().toISOString()
+                data: JSON.stringify(payload)
+            });
+        }
+
+        function onAdminMessageSent(res) {
+            appendIncomingMessage({
+                id: res.id,
+                conversation_id: res.conversation_id || currentConversationId,
+                content: res.content,
+                type: res.type,
+                internal_type: res.internal_type,
+                media_type: res.media_type,
+                media_url: res.media_url,
+                metadata: res.metadata,
+                sender: {
+                    id: res.sender_id,
+                    role: 'admin'
+                },
+                created_at: res.created_at || new Date().toISOString()
+            });
+            refreshMessagesForCurrentConversation();
+        }
+
+        $('#chat-form').on('submit', function (e) {
+            e.preventDefault();
+            const message = $('#chat-message-input').val().trim();
+            if (!currentConversationId) return;
+            if (!message && !pendingChatFile) return;
+
+            if (pendingChatFile) {
+                const file = pendingChatFile;
+                uploadAdminChatFile(file).done(function (uploadRes) {
+                    const mediaUrl = storagePathFromUpload(uploadRes);
+                    postAdminChatMessage({
+                        conversation_id: currentConversationId,
+                        type: 'media',
+                        content: message || null,
+                        media_type: uploadRes.type,
+                        media_url: mediaUrl,
+                        media_width: uploadRes.width,
+                        media_height: uploadRes.height,
+                        blurhash: uploadRes.blurhash,
+                        metadata: {
+                            originalName: uploadRes.originalName || file.name,
+                            size: uploadRes.size
+                        }
+                    }).done(function (res) {
+                        $('#chat-message-input').val('');
+                        $('#chat-file-clear').trigger('click');
+                        onAdminMessageSent(res);
+                    }).fail(function (xhr) {
+                        alert(xhr.responseJSON && xhr.responseJSON.message
+                            ? xhr.responseJSON.message
+                            : 'Envoi du fichier impossible.');
                     });
-                    refreshMessagesForCurrentConversation();
-                }
+                }).fail(function (xhr) {
+                    alert(xhr.responseJSON && xhr.responseJSON.message
+                        ? xhr.responseJSON.message
+                        : 'Upload du fichier impossible.');
+                });
+                return;
+            }
+
+            postAdminChatMessage({
+                conversation_id: currentConversationId,
+                type: 'text',
+                content: message
+            }).done(function (res) {
+                $('#chat-message-input').val('');
+                onAdminMessageSent(res);
             });
         });
 

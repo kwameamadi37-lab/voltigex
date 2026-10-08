@@ -124,9 +124,8 @@
     background: linear-gradient(90deg, #082054, #1e3a8a, #005669);
   }
   .preview-mini-body { padding: 0.75rem; color: #475569; }
-  .client-search {
-    margin-bottom: 0.35rem;
-    font-size: 0.8125rem;
+  #user-picker-row .form-select {
+    max-width: 100%;
   }
 </style>
 @endpush
@@ -166,14 +165,13 @@
           </div>
         </div>
 
-        <div class="compose-field" id="user-picker-row">
+        <div class="compose-field align-items-center" id="user-picker-row">
           <label for="user_id">Client</label>
           <div>
-            <input type="search" id="client-filter" class="form-control client-search" placeholder="Filtrer par nom ou email…" autocomplete="off">
-            <select name="user_id" id="user_id" class="form-select mt-1" size="6">
+            <select name="user_id" id="user_id" class="form-select">
               <option value="">— Choisir un client —</option>
               @foreach($users as $u)
-                <option value="{{ $u->id }}" data-email="{{ $u->email }}" data-search="{{ strtolower($u->nom.' '.$u->prenom.' '.$u->email) }}" @selected(old('user_id') == $u->id)>
+                <option value="{{ $u->id }}" data-email="{{ $u->email }}" @selected(old('user_id') == $u->id)>
                   {{ $u->prenom }} {{ $u->nom }} · {{ $u->email }}
                 </option>
               @endforeach
@@ -232,7 +230,6 @@
     const userSelect = document.getElementById('user_id');
     const previewWrap = document.getElementById('selected-email-preview');
     const previewEmail = document.getElementById('selected-email-text');
-    const filter = document.getElementById('client-filter');
     const form = document.getElementById('compose-form');
     const subject = document.getElementById('subject');
     const body = document.getElementById('body');
@@ -263,16 +260,6 @@
       const t = body.value.trim();
       previewBody.textContent = t ? (t.length > 120 ? t.slice(0, 120) + '…' : t) : 'Le contenu apparaîtra ici…';
     }
-
-    filter.addEventListener('input', function () {
-      const q = filter.value.trim().toLowerCase();
-      for (let i = 0; i < userSelect.options.length; i++) {
-        const opt = userSelect.options[i];
-        if (!opt.value) continue;
-        const hay = opt.dataset.search || '';
-        opt.hidden = q.length > 0 && !hay.includes(q);
-      }
-    });
 
     audience.addEventListener('change', syncAudience);
     userSelect.addEventListener('change', syncPreview);

@@ -860,16 +860,21 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
             pendingMedia.mediaUrl!,
             originalFileName: pendingMedia.mediaName,
           );
+          final relativeFromApi =
+              uploadedMediaInfos['relative_media_url']?.toString().trim();
           final serverMediaUrl = uploadedMediaInfos['url']?.toString().trim();
-          if (serverMediaUrl == null || serverMediaUrl.isEmpty) {
+          if ((relativeFromApi == null || relativeFromApi.isEmpty) &&
+              (serverMediaUrl == null || serverMediaUrl.isEmpty)) {
             _markPendingFailed(pendingMedia.clientId);
             emit(_emitLoaded());
             await _persistMessages();
             continue;
           }
-          final relativeMediaUrl =
-              MediaPathUtils.normalizeStoredMediaPath(serverMediaUrl) ??
-                  serverMediaUrl;
+          final relativeMediaUrl = (relativeFromApi != null &&
+                  relativeFromApi.isNotEmpty)
+              ? relativeFromApi
+              : (MediaPathUtils.normalizeStoredMediaPath(serverMediaUrl!) ??
+                  serverMediaUrl);
           final patchIdx =
               _messages.indexWhere((m) => m.clientId == pendingMedia.clientId);
           if (patchIdx >= 0) {
@@ -1081,15 +1086,20 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
                 localPath,
                 originalFileName: pending.mediaName,
               );
+              final relativeFromApi =
+                  uploadResult['relative_media_url']?.toString().trim();
               final serverMediaUrl = uploadResult['url']?.toString().trim();
-              if (serverMediaUrl == null || serverMediaUrl.isEmpty) {
+              if ((relativeFromApi == null || relativeFromApi.isEmpty) &&
+                  (serverMediaUrl == null || serverMediaUrl.isEmpty)) {
                 _markPendingFailed(clientId);
                 return;
               }
               uploadedMediaInfos = uploadResult;
-              relativeMediaUrl =
-                  MediaPathUtils.normalizeStoredMediaPath(serverMediaUrl) ??
-                      serverMediaUrl;
+              relativeMediaUrl = (relativeFromApi != null &&
+                      relativeFromApi.isNotEmpty)
+                  ? relativeFromApi
+                  : (MediaPathUtils.normalizeStoredMediaPath(serverMediaUrl!) ??
+                      serverMediaUrl);
               final patchIdx = _messages.indexWhere(
                 (m) =>
                     m.clientId == clientId &&

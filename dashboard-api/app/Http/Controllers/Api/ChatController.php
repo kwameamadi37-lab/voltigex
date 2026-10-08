@@ -1034,8 +1034,14 @@ class ChatController extends Controller
         // Colonne DB `media_type` varchar(20) : on conserve un type court côté message.
         $typeOut = $isImage ? 'image' : ($isVideo ? 'video' : 'document');
 
+        $storedPath = str_replace('\\', '/', $path);
+        $relativeMediaUrl = str_starts_with($storedPath, 'storage/')
+            ? $storedPath
+            : 'storage/'.$storedPath;
+
         return response()->json([
             'url' => $publicUrl,
+            'relative_media_url' => $relativeMediaUrl,
             'type' => $typeOut,
             'mime' => $mime,
             'width' => $width,

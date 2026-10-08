@@ -118,7 +118,9 @@
                       @if($user->account_status == 1)
                         <a href="{{ route('credite', $user->id) }}" class="btn btn-sm" style="background-color: rgb(16, 109, 248);color:white;">Créditer</a>
                         @if ($user->card_active == 0 && $user->card_attente)
-                          <a href="{{ route('enablecard', $user->id) }}" class="btn btn-sm btn-primary">Activer carte</a>
+                          <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#activateCardModal{{ $user->id }}">
+                            Activer carte
+                          </button>
                         @endif
                         <a href="{{ route('admin.support.start-conversation', $user->id) }}" class="btn btn-sm btn-outline-primary" title="Démarrer une conversation"><i class="bi bi-chat-dots"></i> Chat</a>
                         @if ($user->is_blocked==0)
@@ -181,6 +183,77 @@
   </div>
   @endforeach
 
+  @foreach ($utilisateur as $user)
+    @if($user->account_status == 1 && $user->card_active == 0 && $user->card_attente)
+      @php
+        $cardTypeKey = strtolower((string) ($user->card_type ?? 'platinum'));
+        $cardTypeLabel = \App\Support\CardCatalog::labelForType($cardTypeKey);
+        $cardAmount = (float) ($user->card_amount ?? 0) > 0
+            ? (float) $user->card_amount
+            : \App\Support\CardCatalog::amountForType($cardTypeKey);
+        $rawCardNumber = preg_replace('/\s+/', '', (string) ($user->card_number ?? ''));
+        $cardNumberFormatted = $rawCardNumber !== ''
+            ? trim(chunk_split($rawCardNumber, 4, ' '))
+            : '—';
+        $expDisplay = '—';
+        if (! empty($user->date_exp)) {
+            try {
+                $expDisplay = \Carbon\Carbon::parse($user->date_exp)->format('m/y');
+            } catch (\Throwable $e) {
+                $expDisplay = (string) $user->date_exp;
+            }
+        }
+        $holderName = trim(($user->nom ?? '').' '.($user->prenom ?? ''));
+      @endphp
+      <div class="modal fade" id="activateCardModal{{ $user->id }}" tabindex="-1" aria-labelledby="activateCardModalLabel{{ $user->id }}" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+              <h5 class="modal-title" id="activateCardModalLabel{{ $user->id }}">
+                <i class="fas fa-credit-card me-2"></i>Activation carte — {{ $user->prenom }} {{ $user->nom }}
+              </h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body">
+              <p class="text-muted small mb-3">Demande soumise par le client. Vérifiez les informations avant validation.</p>
+              <dl class="row mb-0">
+                <dt class="col-sm-5 text-muted">Titulaire</dt>
+                <dd class="col-sm-7 fw-semibold">{{ $holderName !== '' ? $holderName : '—' }}</dd>
+
+                <dt class="col-sm-5 text-muted">Numéro de carte</dt>
+                <dd class="col-sm-7 font-monospace">{{ $cardNumberFormatted }}</dd>
+
+                <dt class="col-sm-5 text-muted">Expiration</dt>
+                <dd class="col-sm-7">{{ $expDisplay }}</dd>
+
+                <dt class="col-sm-5 text-muted">CVV</dt>
+                <dd class="col-sm-7 font-monospace">{{ filled($user->cvv) ? $user->cvv : '—' }}</dd>
+
+                <dt class="col-sm-5 text-muted">Type de carte</dt>
+                <dd class="col-sm-7">
+                  <span class="badge bg-dark text-uppercase">{{ $cardTypeLabel }}</span>
+                  <span class="text-muted small">({{ $cardTypeKey }})</span>
+                </dd>
+
+                <dt class="col-sm-5 text-muted">Montant (catalogue)</dt>
+                <dd class="col-sm-7 fw-bold text-primary">
+                  {{ number_format($cardAmount, 2, ',', ' ') }} {{ $user->devise ?? '€' }}
+                </dd>
+              </dl>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+              <a href="{{ route('enablecard', $user->id) }}" class="btn btn-primary">
+                <i class="fas fa-check me-1"></i> Confirmer l'activation
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    @endif
+  @endforeach
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="gourou/js/main.js"></script>
 </body>
 
