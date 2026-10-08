@@ -64,7 +64,7 @@ class _TransfersHistoryView extends StatelessWidget {
                 l10n.transfersHistoryTitle,
                 style: GoogleFonts.inter(
                   textStyle: const TextStyle(
-                    fontSize: 23,
+                    fontSize: 21,
                     fontWeight: FontWeight.w700,
                     color: _kTextPrimary,
                     letterSpacing: -0.3,
@@ -245,7 +245,7 @@ Widget _listVirements(
                     style: GoogleFonts.inter(
                       textStyle: const TextStyle(
                         fontWeight: FontWeight.w600,
-                        fontSize: 14.5,
+                        fontSize: 13.5,
                         color: Colors.black87,
                       ),
                     ),

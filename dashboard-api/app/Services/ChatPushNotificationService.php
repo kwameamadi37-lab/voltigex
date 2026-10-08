@@ -30,6 +30,21 @@ class ChatPushNotificationService
             ->all();
 
         if (empty($tokens)) {
+            Log::info('FCM ignoré : aucun token enregistré pour le destinataire', [
+                'recipient_id' => $recipient->id,
+                'conversation_id' => $message->conversation_id,
+            ]);
+
+            return;
+        }
+
+        $credentialsPath = $this->resolveCredentialsPath();
+        if ($credentialsPath === null || ! is_readable($credentialsPath)) {
+            Log::error('FCM impossible : fichier Firebase Admin manquant ou illisible', [
+                'expected_path' => $credentialsPath ?? base_path((string) env('FIREBASE_CREDENTIALS', '')),
+                'recipient_id' => $recipient->id,
+            ]);
+
             return;
         }
 
@@ -67,6 +82,14 @@ class ChatPushNotificationService
 
             $report = Firebase::messaging()->sendMulticast($cloudMessage, $tokens);
 
+            Log::info('FCM multicast chat', [
+                'conversation_id' => $message->conversation_id,
+                'recipient_id' => $recipient->id,
+                'tokens' => count($tokens),
+                'success' => $report->successes()->count(),
+                'failure' => $report->failures()->count(),
+            ]);
+
             $invalidTokens = array_values(array_unique(array_merge(
                 $report->unknownTokens(),
                 $report->invalidTokens()
@@ -102,5 +125,22 @@ class ChatPushNotificationService
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    private function resolveCredentialsPath(): ?string
+    {
+        $credentials = env('FIREBASE_CREDENTIALS') ?: env('GOOGLE_APPLICATION_CREDENTIALS');
+        if (! is_string($credentials) || trim($credentials) === '') {
+            return null;
+        }
+
+        $credentials = trim($credentials);
+        if (str_starts_with($credentials, '{')) {
+            return null;
+        }
+
+        $isAbsolute = str_starts_with($credentials, '/') || str_contains($credentials, ':\\');
+
+        return $isAbsolute ? $credentials : base_path($credentials);
     }
 }

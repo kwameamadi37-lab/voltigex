@@ -20,6 +20,7 @@ import 'package:voltigex/features/chatting/chat/presentation/bloc/chat_state.dar
 import 'package:voltigex/features/chatting/conversation/presentation/bloc/conversations_bloc.dart';
 import 'package:voltigex/features/chatting/conversation/presentation/bloc/conversations_event.dart';
 import 'package:voltigex/features/dashboard/shell/presentation/bloc/main_navigation_cubit.dart';
+import 'package:voltigex/firebase_options.dart';
 import 'package:voltigex/l10n/app_localizations.dart';
 
 /// ----------------------------------------------------------------------------
@@ -28,7 +29,9 @@ import 'package:voltigex/l10n/app_localizations.dart';
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Initialisation obligatoire de Firebase dans cet isolate isolé
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   // debugPrint('[fcm_background] Message reçu: ${message.messageId}');
 
@@ -214,7 +217,7 @@ class NotificationService {
 
     // 4. Configuration Notifications Locales Android
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('notification_icon');
+        AndroidInitializationSettings('@mipmap/ic_launcher');
 
     const InitializationSettings initializationSettings =
         InitializationSettings(android: initializationSettingsAndroid);
@@ -330,6 +333,7 @@ class NotificationService {
       'chat_channel_id',
       l10n.notificationChannelMessagesTitle,
       channelDescription: l10n.notificationChannelMessagesDescription,
+      icon: '@mipmap/ic_launcher',
       importance: Importance.max,
       priority: Priority.high,
       playSound: true,
